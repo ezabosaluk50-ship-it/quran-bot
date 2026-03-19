@@ -1,6 +1,5 @@
 import os
 import logging
-import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -34,6 +33,7 @@ SURAHS = [
     "الإخلاص","الفلق","الناس"
 ]
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     row = []
@@ -49,6 +49,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
+
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -81,19 +82,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await query.message.reply_voice(
                 voice=audio_url,
-                caption=f"🎙️ سورة *{surah_name}* — {reader_name}\n\n/start لسورة أخرى",
+                caption=f"🎙 سورة *{surah_name}* — {reader_name}\n\n/start لسورة أخرى",
                 parse_mode="Markdown"
             )
         except Exception:
-            await query.message.reply_text("⚠️ تعذّر التحميل.\n/start للبدء من جديد")
+            await query.message.reply_text("تعذر التحميل.\n/start للبدء من جديد")
+
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.run_polling()
-```
-
-وحدّث `requirements.txt` بهذا:
-```
-python-telegram-bot[job-queue]==21.3
