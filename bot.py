@@ -7,23 +7,24 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
+# (اسم, معرف, مصدر) المصدر: q=quranicaudio, m=mp3quran
 READERS_LIST = [
-    ("مشاري العفاسي",              "mishaari_raashid_al_3afaasee"),
-    ("ماهر المعيقلي",              "maher_al_muaiqly"),
-    ("عبد الباسط عبد الصمد",       "abdul_basit_murattal"),
-    ("عبد الرحمن السديس",          "abdurrahmaan_as-sudais"),
-    ("سعد الغامدي",                "sa3d_al-ghaamidi"),
-    ("ناصر القطامي",               "naasir_al-qataami"),
-    ("ياسر الدوسري",               "yasser_ad-dussary"),
-    ("إدريس أبكر",                 "idrees_abkar"),
-    ("محمد صديق المنشاوي",         "muhammad_siddeeq_al-minshaawee"),
-    ("محمود خليل الحصري",          "mahmood_khaleel_al-husaree"),
-    ("علي عبد الله جابر",          "ali_abdallah_jabir"),
-    ("أحمد العجمي",                "ahmed_ibn_ali_al-ajamy"),
-    ("خالد الجليل",                "khaalid_al-qahtaanee"),
-    ("فارس عباد",                  "fares_abbad"),
-    ("هاني الرفاعي",               "haani_ar-rifaa3i"),
-    ("إسلام صبحي",                 "islam_sobhi"),
+    ("مشاري العفاسي",        "mishaari_raashid_al_3afaasee", "q"),
+    ("ماهر المعيقلي",        "maher_al_muaiqly",             "q"),
+    ("عبد الباسط عبد الصمد", "abdul_basit_murattal",         "q"),
+    ("عبد الرحمن السديس",    "abdurrahmaan_as-sudais",       "q"),
+    ("سعد الغامدي",          "sa3d_al-ghaamidi",             "q"),
+    ("ناصر القطامي",         "naasir_al-qataami",            "q"),
+    ("ياسر الدوسري",         "yasser_ad-dussary",            "q"),
+    ("إدريس أبكر",           "idrees_abkar",                 "q"),
+    ("محمد صديق المنشاوي",   "muhammad_siddeeq_al-minshaawee", "q"),
+    ("محمود خليل الحصري",    "mahmood_khaleel_al-husaree",   "q"),
+    ("علي عبد الله جابر",    "ali_abdallah_jabir",           "q"),
+    ("أحمد العجمي",          "ahmed_ibn_ali_al-ajamy",       "q"),
+    ("خالد الجليل",          "khaalid_al-qahtaanee",         "q"),
+    ("فارس عباد",            "fares_abbad",                  "q"),
+    ("هاني الرفاعي",         "haani_ar-rifaa3i",             "q"),
+    ("إسلام صبحي",           "islam",                        "m"),
 ]
 
 SURAHS = [
@@ -73,7 +74,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         surah_name = SURAHS[int(surah_num) - 1]
         keyboard = [
             [InlineKeyboardButton(name, callback_data=f"reader_{i}")]
-            for i, (name, _) in enumerate(READERS_LIST)
+            for i, (name, _, _src) in enumerate(READERS_LIST)
         ]
         await query.edit_message_text(
             f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
@@ -83,7 +84,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("reader_"):
         reader_index = int(data.split("_")[1])
-        reader_name, reader_id = READERS_LIST[reader_index]
+        reader_name, reader_id, source = READERS_LIST[reader_index]
         surah_num = context.user_data.get("surah", "1")
         surah_name = SURAHS[int(surah_num) - 1]
 
@@ -92,7 +93,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
         surah_str = str(surah_num).zfill(3)
-        audio_url = f"https://download.quranicaudio.com/quran/{reader_id}/{surah_str}.mp3"
+
+        if source == "m":
+            audio_url = f"https://server10.mp3quran.net/{reader_id}/{surah_str}.mp3"
+        else:
+            audio_url = f"https://download.quranicaudio.com/quran/{reader_id}/{surah_str}.mp3"
+
         logging.info(f"Fetching: {audio_url}")
         try:
             await query.message.reply_voice(
