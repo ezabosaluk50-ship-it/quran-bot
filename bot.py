@@ -1,13 +1,10 @@
 import os
-import requests
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application, CommandHandler, CallbackQueryHandler, ContextTypes
-)
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# قائمة القراء المشهورين مع معرفاتهم في mp3quran.net
 READERS = {
     "عبد الباسط عبد الصمد": "1",
     "ماهر المعيقلي":        "69",
@@ -16,7 +13,6 @@ READERS = {
     "سعد الغامدي":          "9",
 }
 
-# أسماء السور (1 إلى 114)
 SURAHS = [
     "الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف",
     "الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر",
@@ -85,7 +81,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-        # بناء رابط الصوت من mp3quran.net
         surah_str = str(surah_num).zfill(3)
         audio_url = f"https://server8.mp3quran.net/{reader_id}/{surah_str}.mp3"
 
@@ -95,18 +90,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption=f"🎙️ سورة *{surah_name}* — {reader_name}\n\n/start للاستماع لسورة أخرى",
                 parse_mode="Markdown"
             )
-        except Exception as e:
+        except Exception:
             await query.message.reply_text(
                 "⚠️ تعذّر تحميل الملف الصوتي، جرّب قارئاً آخر.\n/start للبدء من جديد"
             )
 
 
-def main():
+async def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_callback))
-    app.run_polling()
+    await app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
