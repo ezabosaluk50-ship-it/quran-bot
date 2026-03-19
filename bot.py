@@ -1,7 +1,9 @@
 import os
-import asyncio
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+
+logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
@@ -32,7 +34,7 @@ SURAHS = [
 ]
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def start(update: Update, context: CallbackContext):
     keyboard = []
     row = []
     for i, name in enumerate(SURAHS, 1):
@@ -43,16 +45,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if row:
         keyboard.append(row)
 
-    await update.message.reply_text(
+    update.message.reply_text(
         "🕌 *بوت القرآن الكريم*\n\nاختر السورة التي تريد الاستماع إليها:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
 
 
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def handle_callback(update: Update, context: CallbackContext):
     query = update.callback_query
-    await query.answer()
+    query.answer()
     data = query.data
 
     if data.startswith("surah_"):
@@ -64,7 +66,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton(name, callback_data=f"reader_{rid}")]
             for name, rid in READERS.items()
         ]
-        await query.edit_message_text(
+        query.edit_message_text(
             f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
@@ -76,7 +78,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         surah_name = SURAHS[int(surah_num) - 1]
         reader_name = next(n for n, i in READERS.items() if i == reader_id)
 
-        await query.edit_message_text(
+        query.edit_message_text(
             f"⏳ جاري تحميل سورة *{surah_name}* بصوت *{reader_name}*...",
             parse_mode="Markdown"
         )
@@ -85,23 +87,25 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         audio_url = f"https://server8.mp3quran.net/{reader_id}/{surah_str}.mp3"
 
         try:
-            await query.message.reply_voice(
+            query.message.reply_voice(
                 voice=audio_url,
                 caption=f"🎙️ سورة *{surah_name}* — {reader_name}\n\n/start للاستماع لسورة أخرى",
                 parse_mode="Markdown"
             )
         except Exception:
-            await query.message.reply_text(
+            query.message.reply_text(
                 "⚠️ تعذّر تحميل الملف الصوتي، جرّب قارئاً آخر.\n/start للبدء من جديد"
             )
 
 
-async def main():
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(handle_callback))
-    await app.run_polling(allowed_updates=Update.ALL_TYPES)
+def main():
+    updater = Updater(TOKEN)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CallbackQueryHandler(handle_callback))
+    updater.start_polling()
+    updater.idle()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
