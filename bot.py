@@ -8,11 +8,21 @@ logging.basicConfig(level=logging.INFO)
 TOKEN = os.environ.get("BOT_TOKEN")
 
 READERS_LIST = [
-    ("عبد الباسط عبد الصمد", "abdul_basit_murattal"),
-    ("ماهر المعيقلي",        "maher_al_muaiqly"),
-    ("مشاري العفاسي",        "mishaari_raashid_al_3afaasee"),
-    ("عبد الرحمن السديس",    "abdurrahmaan_as-sudais"),
-    ("سعد الغامدي",          "sa3d_al-ghaamidi"),
+    ("مشاري العفاسي",              "mishaari_raashid_al_3afaasee"),
+    ("ماهر المعيقلي",              "maher_al_muaiqly"),
+    ("عبد الباسط عبد الصمد",       "abdul_basit_murattal"),
+    ("عبد الرحمن السديس",          "abdurrahmaan_as-sudais"),
+    ("سعد الغامدي",                "sa3d_al-ghaamidi"),
+    ("ناصر القطامي",               "naasir_al-qataami"),
+    ("ياسر الدوسري",               "yasser_ad-dussary"),
+    ("إدريس أبكر",                 "idrees_abkar"),
+    ("محمد صديق المنشاوي",         "muhammad_siddeeq_al-minshaawee"),
+    ("محمود خليل الحصري",          "mahmood_khaleel_al-husaree"),
+    ("علي عبد الله جابر",          "ali_abdallah_jabir"),
+    ("أحمد العجمي",                "ahmed_ibn_ali_al-ajamy"),
+    ("خالد الجليل",                "khaalid_al-qahtaanee"),
+    ("فارس عباد",                  "fares_abbad"),
+    ("هاني الرفاعي",               "haani_ar-rifaa3i"),
 ]
 
 SURAHS = [
@@ -91,7 +101,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             logging.error(f"Error: {e}")
-            await query.message.reply_text(f"تعذر التحميل: {str(e)[:100]}\n/start للبدء من جديد")
+            await query.message.reply_text(f"تعذر التحميل.\n/start للبدء من جديد")
 
 
 if __name__ == "__main__":
