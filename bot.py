@@ -8,11 +8,11 @@ logging.basicConfig(level=logging.INFO)
 TOKEN = os.environ.get("BOT_TOKEN")
 
 READERS = {
-    "عبد الباسط عبد الصمد": "1",
-    "ماهر المعيقلي": "69",
-    "مشاري العفاسي": "10",
-    "عبد الرحمن السديس": "6",
-    "سعد الغامدي": "9",
+    "عبد الباسط عبد الصمد": "Abdul_Basit_Murattal_64kbps",
+    "ماهر المعيقلي":        "Maher_AlMuaiqly_64kbps",
+    "مشاري العفاسي":        "Mishary_Rashid_Alafasy_128kbps",
+    "عبد الرحمن السديس":    "Abdurrahmaan_As-Sudais_192kbps",
+    "سعد الغامدي":          "Saad_Al-Ghamdi_128kbps",
 }
 
 SURAHS = [
@@ -78,14 +78,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
         surah_str = str(surah_num).zfill(3)
-        audio_url = f"https://server8.mp3quran.net/{reader_id}/{surah_str}.mp3"
+        audio_url = f"https://download.quranicaudio.com/quran/{reader_id}/{surah_str}.mp3"
         try:
             await query.message.reply_voice(
                 voice=audio_url,
-                caption=f"🎙 سورة *{surah_name}* — {reader_name}\n\n/start لسورة أخرى",
+                caption=f"سورة *{surah_name}* — {reader_name}\n\n/start لسورة اخرى",
                 parse_mode="Markdown"
             )
-        except Exception:
+        except Exception as e:
+            logging.error(f"Error: {e}")
             await query.message.reply_text("تعذر التحميل.\n/start للبدء من جديد")
 
 
