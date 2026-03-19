@@ -23,6 +23,7 @@ READERS_LIST = [
     ("خالد الجليل",                "khaalid_al-qahtaanee"),
     ("فارس عباد",                  "fares_abbad"),
     ("هاني الرفاعي",               "haani_ar-rifaa3i"),
+    ("إسلام صبحي",                 "islam_sobhi"),
 ]
 
 SURAHS = [
@@ -101,7 +102,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             logging.error(f"Error: {e}")
-            await query.message.reply_text(f"تعذر التحميل.\n/start للبدء من جديد")
+            await query.message.reply_text("تعذر التحميل.\n/start للبدء من جديد")
 
 
 if __name__ == "__main__":
