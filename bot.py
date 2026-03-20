@@ -17,28 +17,25 @@ WELCOME_MESSAGE = """🌙 أهلاً وسهلاً بك في بوت القرآن 
 🤍 نسأل الله أن يجعل هذا العمل صدقة جارية لنا ولكم، وأن يرزقنا وإياكم حب القرآن والعمل به
 🎧 ابدأ الآن واستمع لكلام الله بصوتك المفضل"""
 
-# المعرف من cdn.islamic.network
 READERS_LIST = [
-    ("مشاري العفاسي",        "ar.alafasy"),
-    ("ماهر المعيقلي",        "ar.mahermuaiqly"),
-    ("عبد الباسط عبد الصمد", "ar.abdulbasitmurattal"),
-    ("عبد الرحمن السديس",    "ar.abdurrahmaansudais"),
-    ("سعد الغامدي",          "ar.saoodshuraym"),
-    ("ناصر القطامي",         "ar.nasseral-qatami"),
-    ("ياسر الدوسري",         "ar.yasseraldossari"),
-    ("إدريس أبكر",           "ar.idrispabkar"),
-    ("محمد صديق المنشاوي",   "ar.muhammadayyoub"),
-    ("محمود خليل الحصري",    "ar.husary"),
-    ("أحمد العجمي",          "ar.ahmedajamy"),
-    ("خالد الجليل",          "ar.khaledaljleel"),
+    ("مشاري العفاسي",        "https://server8.mp3quran.net/afs/"),
+    ("ماهر المعيقلي",        "https://server12.mp3quran.net/maher/"),
+    ("عبد الباسط عبد الصمد", "https://server7.mp3quran.net/basit/"),
+    ("عبد الرحمن السديس",    "https://server11.mp3quran.net/sds/"),
+    ("سعد الغامدي",          "https://server7.mp3quran.net/s_gmd/"),
+    ("ناصر القطامي",         "https://server6.mp3quran.net/qtm/"),
+    ("ياسر الدوسري",         "https://server11.mp3quran.net/yasser/"),
+    ("إدريس أبكر",           "https://server6.mp3quran.net/abkr/"),
+    ("محمد صديق المنشاوي",   "https://server10.mp3quran.net/minsh/"),
+    ("محمود خليل الحصري",    "https://server13.mp3quran.net/husr/"),
+    ("أحمد العجمي",          "https://server10.mp3quran.net/ajm/"),
+    ("خالد الجليل",          "https://server10.mp3quran.net/jleel/"),
     ("فارس عباد",            "https://server8.mp3quran.net/frs_a/"),
     ("هاني الرفاعي",         "https://server8.mp3quran.net/hani/"),
-    ("علي الحذيفي",          "ar.abdullahbasfar"),
+    ("علي الحذيفي",          "https://server9.mp3quran.net/hthfi/"),
     ("إسلام صبحي",           "https://portalquran.com/file/islam/"),
     ("عبدالله الجهني",        "https://server13.mp3quran.net/jhn/"),
 ]
-
-CDN_BASE = "https://cdn.islamic.network/quran/audio-surah/128"
 
 SURAHS = [
     "الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف",
@@ -57,12 +54,6 @@ SURAHS = [
     "الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد",
     "الإخلاص","الفلق","الناس"
 ]
-
-
-def get_audio_url(reader_id, surah_num):
-    if reader_id.startswith("http"):
-        return f"{reader_id}{str(surah_num).zfill(3)}.mp3"
-    return f"{CDN_BASE}/{reader_id}/{surah_num}.mp3"
 
 
 def load_users():
@@ -243,7 +234,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("reader_"):
         reader_index = int(data.split("_")[1])
-        reader_name, reader_id = READERS_LIST[reader_index]
+        reader_name, server_url = READERS_LIST[reader_index]
         surah_num = context.user_data.get("surah", "1")
         surah_name = SURAHS[int(surah_num) - 1]
 
@@ -254,10 +245,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-        audio_url = get_audio_url(reader_id, surah_num)
+        surah_str = str(surah_num).zfill(3)
+        audio_url = f"{server_url}{surah_str}.mp3"
         logging.info(f"Fetching: {audio_url}")
         try:
-            await query.message.reply_audio(
+            await query.message.reply_voice(
                 voice=audio_url,
                 caption=f"سورة *{surah_name}* — {reader_name}\n\n/start لسورة اخرى",
                 parse_mode="Markdown"
