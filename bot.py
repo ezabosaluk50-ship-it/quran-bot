@@ -1,6 +1,5 @@
 import os
 import logging
-import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -8,7 +7,13 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# القراء مع روابطهم الصحيحة من mp3quran.net
+WELCOME_MESSAGE = """🌙 أهلاً وسهلاً بك في بوت القرآن الكريم 🌙
+🤍 هذا البوت مخصص للاستماع إلى القرآن الكريم بصوت نخبة من أجمل القرّاء، لتعيش مع آيات الله في أي وقت وأي مكان
+📖 اختر القارئ الذي تحب، واستمع بخشوع وتدبّر، واجعل القرآن رفيقك اليومي قال تعالى: "ألا بذكر الله تطمئن القلوب"
+✨ لا تحرم غيرك من الأجر شارك البوت مع أصدقائك وأهلك، فربما آية يسمعها أحدهم تكون سببًا في هدايته، ويكون لك مثل أجره 🤲
+🤍 نسأل الله أن يجعل هذا العمل صدقة جارية لنا ولكم، وأن يرزقنا وإياكم حب القرآن والعمل به
+🎧 ابدأ الآن واستمع لكلام الله بصوتك المفضل"""
+
 READERS_LIST = [
     ("مشاري العفاسي",        "https://server8.mp3quran.net/afs/"),
     ("ماهر المعيقلي",        "https://server8.mp3quran.net/maher/"),
@@ -48,6 +53,7 @@ SURAHS = [
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(WELCOME_MESSAGE)
     keyboard = []
     row = []
     for i, name in enumerate(SURAHS, 1):
@@ -58,9 +64,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if row:
         keyboard.append(row)
     await update.message.reply_text(
-        "🕌 *بوت القرآن الكريم*\n\nاختر السورة:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
+        "📖 اختر السورة:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
