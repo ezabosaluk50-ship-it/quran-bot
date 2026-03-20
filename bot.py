@@ -52,17 +52,23 @@ SURAHS = [
 ]
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(WELCOME_MESSAGE)
+def build_keyboard(items, cols, callback_prefix):
     keyboard = []
     row = []
-    for i, name in enumerate(SURAHS, 1):
-        row.append(InlineKeyboardButton(f"{i}. {name}", callback_data=f"surah_{i}"))
-        if len(row) == 2:
+    for i, item in enumerate(items):
+        label = item if isinstance(item, str) else item[0]
+        row.append(InlineKeyboardButton(label, callback_data=f"{callback_prefix}{i+1}" if callback_prefix == "surah_" else f"{callback_prefix}{i}"))
+        if len(row) == cols:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
+    return keyboard
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(WELCOME_MESSAGE)
+    keyboard = build_keyboard(SURAHS, 4, "surah_")
     await update.message.reply_text(
         "📖 اختر السورة:",
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -78,10 +84,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         surah_num = data.split("_")[1]
         context.user_data["surah"] = surah_num
         surah_name = SURAHS[int(surah_num) - 1]
-        keyboard = [
-            [InlineKeyboardButton(name, callback_data=f"reader_{i}")]
-            for i, (name, _) in enumerate(READERS_LIST)
-        ]
+        keyboard = build_keyboard(READERS_LIST, 3, "reader_")
         await query.edit_message_text(
             f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
             reply_markup=InlineKeyboardMarkup(keyboard),
