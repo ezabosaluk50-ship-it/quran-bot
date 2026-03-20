@@ -33,7 +33,7 @@ READERS_LIST = [
     ("فارس عباد",            "https://server8.mp3quran.net/frs_a/"),
     ("هاني الرفاعي",         "https://server8.mp3quran.net/hani/"),
     ("علي الحذيفي",          "https://server9.mp3quran.net/hthfi/"),
-    ("إسلام صبحي",           "https://server14.mp3quran.net/islam/Rewayat-Hafs-A-n-Assem/"),
+    ("إسلام صبحي",           "https://portalquran.com/file/islam/"),
     ("عبدالله الجهني",        "https://server13.mp3quran.net/jhn/"),
 ]
 
