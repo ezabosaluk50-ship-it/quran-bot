@@ -17,25 +17,28 @@ WELCOME_MESSAGE = """🌙 أهلاً وسهلاً بك في بوت القرآن 
 🤍 نسأل الله أن يجعل هذا العمل صدقة جارية لنا ولكم، وأن يرزقنا وإياكم حب القرآن والعمل به
 🎧 ابدأ الآن واستمع لكلام الله بصوتك المفضل"""
 
+# المعرف من cdn.islamic.network
 READERS_LIST = [
-    ("مشاري العفاسي",        "https://server8.mp3quran.net/afs/"),
-    ("ماهر المعيقلي",        "https://server12.mp3quran.net/maher/"),
-    ("عبد الباسط عبد الصمد", "https://server7.mp3quran.net/basit/"),
-    ("عبد الرحمن السديس",    "https://server11.mp3quran.net/sds/"),
-    ("سعد الغامدي",          "https://server7.mp3quran.net/s_gmd/"),
-    ("ناصر القطامي",         "https://server6.mp3quran.net/qtm/"),
-    ("ياسر الدوسري",         "https://server11.mp3quran.net/yasser/"),
-    ("إدريس أبكر",           "https://server6.mp3quran.net/abkr/"),
-    ("محمد صديق المنشاوي",   "https://server10.mp3quran.net/minsh/"),
-    ("محمود خليل الحصري",    "https://server13.mp3quran.net/husr/"),
-    ("أحمد العجمي",          "https://server10.mp3quran.net/ajm/"),
-    ("خالد الجليل",          "https://server10.mp3quran.net/jleel/"),
+    ("مشاري العفاسي",        "ar.alafasy"),
+    ("ماهر المعيقلي",        "ar.mahermuaiqly"),
+    ("عبد الباسط عبد الصمد", "ar.abdulbasitmurattal"),
+    ("عبد الرحمن السديس",    "ar.abdurrahmaansudais"),
+    ("سعد الغامدي",          "ar.saoodshuraym"),
+    ("ناصر القطامي",         "ar.nasseral-qatami"),
+    ("ياسر الدوسري",         "ar.yasseraldossari"),
+    ("إدريس أبكر",           "ar.idrispabkar"),
+    ("محمد صديق المنشاوي",   "ar.muhammadayyoub"),
+    ("محمود خليل الحصري",    "ar.husary"),
+    ("أحمد العجمي",          "ar.ahmedajamy"),
+    ("خالد الجليل",          "ar.khaledaljleel"),
     ("فارس عباد",            "https://server8.mp3quran.net/frs_a/"),
     ("هاني الرفاعي",         "https://server8.mp3quran.net/hani/"),
-    ("علي الحذيفي",          "https://server9.mp3quran.net/hthfi/"),
+    ("علي الحذيفي",          "ar.abdullahbasfar"),
     ("إسلام صبحي",           "https://portalquran.com/file/islam/"),
     ("عبدالله الجهني",        "https://server13.mp3quran.net/jhn/"),
 ]
+
+CDN_BASE = "https://cdn.islamic.network/quran/audio-surah/128"
 
 SURAHS = [
     "الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف",
@@ -56,7 +59,12 @@ SURAHS = [
 ]
 
 
-# ===== إدارة المستخدمين =====
+def get_audio_url(reader_id, surah_num):
+    if reader_id.startswith("http"):
+        return f"{reader_id}{str(surah_num).zfill(3)}.mp3"
+    return f"{CDN_BASE}/{reader_id}/{surah_num}.mp3"
+
+
 def load_users():
     try:
         with open(USERS_FILE, "r") as f:
@@ -75,8 +83,7 @@ def save_user(user_id, username, full_name):
 
 def get_favorite_reader(user_id):
     users = load_users()
-    user = users.get(str(user_id), {})
-    return user.get("favorite_reader")
+    return users.get(str(user_id), {}).get("favorite_reader")
 
 def save_favorite_reader(user_id, reader_index):
     users = load_users()
@@ -86,7 +93,6 @@ def save_favorite_reader(user_id, reader_index):
             json.dump(users, f, ensure_ascii=False, indent=2)
 
 
-# ===== بناء الأزرار =====
 def build_surah_keyboard(page=1):
     if page == 1:
         surahs_slice = SURAHS[:57]
@@ -135,7 +141,6 @@ def build_readers_keyboard(user_id=None):
     return keyboard
 
 
-# ===== الأوامر =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     is_new = save_user(user.id, user.username, user.full_name)
@@ -144,12 +149,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_new:
         await update.message.reply_text(WELCOME_MESSAGE)
 
-    # إذا عنده قارئ مفضل نذكّره
     favorite = get_favorite_reader(user.id)
     if favorite is not None:
         reader_name = READERS_LIST[favorite][0]
         await update.message.reply_text(
-            f"⭐ قارئك المفضل: *{reader_name}*\n\nاختر سورة للاستماع بصوته مباشرة، أو اختر قارئاً آخر.",
+            f"⭐ قارئك المفضل: *{reader_name}*",
             parse_mode="Markdown"
         )
 
@@ -231,36 +235,26 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["surah"] = surah_num
         context.user_data["searching"] = False
         surah_name = SURAHS[int(surah_num) - 1]
-
-        # إذا عنده قارئ مفضل نضيف زر سريع له
-        favorite = get_favorite_reader(user_id)
-        keyboard = build_readers_keyboard(user_id)
-        text = f"📖 *سورة {surah_name}*\n\nاختر القارئ:"
-        if favorite is not None:
-            reader_name = READERS_LIST[favorite][0]
-            text += f"\n\n⭐ قارئك المفضل: *{reader_name}*"
-
         await query.edit_message_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
+            reply_markup=InlineKeyboardMarkup(build_readers_keyboard(user_id)),
             parse_mode="Markdown"
         )
 
     elif data.startswith("reader_"):
         reader_index = int(data.split("_")[1])
-        reader_name, server_url = READERS_LIST[reader_index]
+        reader_name, reader_id = READERS_LIST[reader_index]
         surah_num = context.user_data.get("surah", "1")
         surah_name = SURAHS[int(surah_num) - 1]
 
-        # حفظ القارئ كمفضل
         save_favorite_reader(user_id, reader_index)
 
         await query.edit_message_text(
             f"⏳ جاري تحميل سورة *{surah_name}* بصوت *{reader_name}*...",
             parse_mode="Markdown"
         )
-        surah_str = str(surah_num).zfill(3)
-        audio_url = f"{server_url}{surah_str}.mp3"
+
+        audio_url = get_audio_url(reader_id, surah_num)
         logging.info(f"Fetching: {audio_url}")
         try:
             await query.message.reply_voice(
