@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -6,6 +7,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
+ADMIN_ID = os.environ.get("ADMIN_ID")  # ضع ID حسابك في تيليغرام
+USERS_FILE = "users.json"
 
 WELCOME_MESSAGE = """🌙 أهلاً وسهلاً بك في بوت القرآن الكريم 🌙
 🤍 هذا البوت مخصص للاستماع إلى القرآن الكريم بصوت نخبة من أجمل القرّاء، لتعيش مع آيات الله في أي وقت وأي مكان
@@ -53,6 +56,28 @@ SURAHS = [
 ]
 
 
+# ===== إدارة المستخدمين =====
+def load_users():
+    try:
+        with open(USERS_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_user(user_id, username, full_name):
+    users = load_users()
+    users[str(user_id)] = {
+        "username": username,
+        "name": full_name,
+    }
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+def get_users_count():
+    return len(load_users())
+
+
+# ===== بناء الأزرار =====
 def build_keyboard(items, cols, prefix):
     keyboard = []
     row = []
@@ -68,12 +93,30 @@ def build_keyboard(items, cols, prefix):
     return keyboard
 
 
+# ===== الأوامر =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    save_user(user.id, user.username, user.full_name)
+
     await update.message.reply_text(WELCOME_MESSAGE)
     keyboard = build_keyboard(SURAHS, 4, "surah_")
     await update.message.reply_text(
         "📖 اختر السورة:",
         reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if ADMIN_ID and user_id != ADMIN_ID:
+        await update.message.reply_text("⛔ هذا الأمر للمشرف فقط.")
+        return
+
+    count = get_users_count()
+    await update.message.reply_text(
+        f"📊 *إحصائيات البوت*\n\n"
+        f"👥 عدد المستخدمين: *{count}*",
+        parse_mode="Markdown"
     )
 
 
@@ -120,5 +163,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.run_polling()
