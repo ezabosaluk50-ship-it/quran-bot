@@ -56,6 +56,7 @@ SURAHS = [
 ]
 
 
+# ===== إدارة المستخدمين =====
 def load_users():
     try:
         with open(USERS_FILE, "r") as f:
@@ -66,12 +67,26 @@ def load_users():
 def save_user(user_id, username, full_name):
     users = load_users()
     is_new = str(user_id) not in users
-    users[str(user_id)] = {"username": username, "name": full_name}
+    if is_new:
+        users[str(user_id)] = {"username": username, "name": full_name, "favorite_reader": None}
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
     return is_new
 
+def get_favorite_reader(user_id):
+    users = load_users()
+    user = users.get(str(user_id), {})
+    return user.get("favorite_reader")
 
+def save_favorite_reader(user_id, reader_index):
+    users = load_users()
+    if str(user_id) in users:
+        users[str(user_id)]["favorite_reader"] = reader_index
+        with open(USERS_FILE, "w") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+
+
+# ===== بناء الأزرار =====
 def build_surah_keyboard(page=1):
     if page == 1:
         surahs_slice = SURAHS[:57]
@@ -105,11 +120,13 @@ def build_surah_keyboard(page=1):
     return keyboard
 
 
-def build_readers_keyboard():
+def build_readers_keyboard(user_id=None):
+    favorite = get_favorite_reader(user_id) if user_id else None
     keyboard = []
     row = []
     for i, (name, _) in enumerate(READERS_LIST):
-        row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
+        label = f"⭐ {name}" if i == favorite else name
+        row.append(InlineKeyboardButton(label, callback_data=f"reader_{i}"))
         if len(row) == 3:
             keyboard.append(row)
             row = []
@@ -118,14 +135,23 @@ def build_readers_keyboard():
     return keyboard
 
 
+# ===== الأوامر =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     is_new = save_user(user.id, user.username, user.full_name)
     context.user_data["searching"] = False
 
-    # رسالة الترحيب للمستخدم الجديد فقط
     if is_new:
         await update.message.reply_text(WELCOME_MESSAGE)
+
+    # إذا عنده قارئ مفضل نذكّره
+    favorite = get_favorite_reader(user.id)
+    if favorite is not None:
+        reader_name = READERS_LIST[favorite][0]
+        await update.message.reply_text(
+            f"⭐ قارئك المفضل: *{reader_name}*\n\nاختر سورة للاستماع بصوته مباشرة، أو اختر قارئاً آخر.",
+            parse_mode="Markdown"
+        )
 
     await update.message.reply_text(
         "📖 اختر السورة — الصفحة 1 (1-57):",
@@ -179,6 +205,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
+    user_id = update.effective_user.id
 
     if data == "page_1":
         await query.edit_message_text(
@@ -204,9 +231,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["surah"] = surah_num
         context.user_data["searching"] = False
         surah_name = SURAHS[int(surah_num) - 1]
+
+        # إذا عنده قارئ مفضل نضيف زر سريع له
+        favorite = get_favorite_reader(user_id)
+        keyboard = build_readers_keyboard(user_id)
+        text = f"📖 *سورة {surah_name}*\n\nاختر القارئ:"
+        if favorite is not None:
+            reader_name = READERS_LIST[favorite][0]
+            text += f"\n\n⭐ قارئك المفضل: *{reader_name}*"
+
         await query.edit_message_text(
-            f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
-            reply_markup=InlineKeyboardMarkup(build_readers_keyboard()),
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
 
@@ -215,6 +251,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reader_name, server_url = READERS_LIST[reader_index]
         surah_num = context.user_data.get("surah", "1")
         surah_name = SURAHS[int(surah_num) - 1]
+
+        # حفظ القارئ كمفضل
+        save_favorite_reader(user_id, reader_index)
 
         await query.edit_message_text(
             f"⏳ جاري تحميل سورة *{surah_name}* بصوت *{reader_name}*...",
