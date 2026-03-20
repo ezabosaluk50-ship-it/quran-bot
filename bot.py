@@ -1,6 +1,5 @@
 import os
 import logging
-import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -15,24 +14,26 @@ WELCOME_MESSAGE = """🌙 أهلاً وسهلاً بك في بوت القرآن 
 🤍 نسأل الله أن يجعل هذا العمل صدقة جارية لنا ولكم، وأن يرزقنا وإياكم حب القرآن والعمل به
 🎧 ابدأ الآن واستمع لكلام الله بصوتك المفضل"""
 
-SELECTED_READERS = {
-    "مشاري العفاسي":        10,
-    "ماهر المعيقلي":        69,
-    "عبد الباسط عبد الصمد": 1,
-    "عبد الرحمن السديس":    6,
-    "سعد الغامدي":          9,
-    "ناصر القطامي":         14,
-    "ياسر الدوسري":         196,
-    "إدريس أبكر":           46,
-    "محمد صديق المنشاوي":   5,
-    "محمود خليل الحصري":    4,
-    "أحمد العجمي":          7,
-    "خالد الجليل":          107,
-    "فارس عباد":            76,
-    "هاني الرفاعي":         17,
-    "علي الحذيفي":          21,
-    "عبدالله الجهني":        160,
-}
+# روابط مباشرة من API الرسمي mp3quran.net
+READERS_LIST = [
+    ("مشاري العفاسي",        "https://server8.mp3quran.net/afs/"),
+    ("ماهر المعيقلي",        "https://server12.mp3quran.net/maher/"),
+    ("عبد الباسط عبد الصمد", "https://server7.mp3quran.net/basit/"),
+    ("عبد الرحمن السديس",    "https://server11.mp3quran.net/sds/"),
+    ("سعد الغامدي",          "https://server7.mp3quran.net/s_gmd/"),
+    ("ناصر القطامي",         "https://server6.mp3quran.net/qtm/"),
+    ("ياسر الدوسري",         "https://server11.mp3quran.net/yasser/"),
+    ("إدريس أبكر",           "https://server6.mp3quran.net/abkr/"),
+    ("محمد صديق المنشاوي",   "https://server10.mp3quran.net/minsh/"),
+    ("محمود خليل الحصري",    "https://server13.mp3quran.net/husr/"),
+    ("أحمد العجمي",          "https://server10.mp3quran.net/ajm/"),
+    ("خالد الجليل",          "https://server10.mp3quran.net/jleel/"),
+    ("فارس عباد",            "https://server8.mp3quran.net/frs_a/"),
+    ("هاني الرفاعي",         "https://server8.mp3quran.net/hani/"),
+    ("علي الحذيفي",          "https://server9.mp3quran.net/hthfi/"),
+    ("إسلام صبحي",           "https://server14.mp3quran.net/islam/Rewayat-Hafs-A-n-Assem/"),
+    ("عبدالله الجهني",        "https://server13.mp3quran.net/jhn/"),
+]
 
 SURAHS = [
     "الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف",
@@ -52,25 +53,6 @@ SURAHS = [
     "الإخلاص","الفلق","الناس"
 ]
 
-READERS_CACHE = {}
-
-def get_reader_server(reader_id):
-    if reader_id in READERS_CACHE:
-        return READERS_CACHE[reader_id]
-    try:
-        url = f"https://www.mp3quran.net/api/v3/reciters?language=ar&reciter={reader_id}"
-        r = requests.get(url, timeout=10)
-        data = r.json()
-        if data.get("reciters") and data["reciters"][0].get("moshaf"):
-            server = data["reciters"][0]["moshaf"][0]["server"]
-            READERS_CACHE[reader_id] = server
-            return server
-    except Exception as e:
-        logging.error(f"API error: {e}")
-    return None
-
-READERS_LIST = list(SELECTED_READERS.items())
-
 
 def build_keyboard(items, cols, prefix):
     keyboard = []
@@ -88,7 +70,9 @@ def build_keyboard(items, cols, prefix):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(WELCOME_MESSAGE)
+    if not context.user_data.get("visited"):
+        context.user_data["visited"] = True
+        await update.message.reply_text(WELCOME_MESSAGE)
     keyboard = build_keyboard(SURAHS, 4, "surah_")
     await update.message.reply_text(
         "📖 اختر السورة:",
@@ -114,7 +98,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("reader_"):
         reader_index = int(data.split("_")[1])
-        reader_name, reader_id = READERS_LIST[reader_index]
+        reader_name, server_url = READERS_LIST[reader_index]
         surah_num = context.user_data.get("surah", "1")
         surah_name = SURAHS[int(surah_num) - 1]
 
@@ -122,14 +106,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⏳ جاري تحميل سورة *{surah_name}* بصوت *{reader_name}*...",
             parse_mode="Markdown"
         )
-
-        server = get_reader_server(reader_id)
-        if not server:
-            await query.message.reply_text("تعذر الاتصال بالخادم.\n/start للبدء من جديد")
-            return
-
         surah_str = str(surah_num).zfill(3)
-        audio_url = f"{server}{surah_str}.mp3"
+        audio_url = f"{server_url}{surah_str}.mp3"
         logging.info(f"Fetching: {audio_url}")
         try:
             await query.message.reply_voice(
