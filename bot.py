@@ -56,7 +56,6 @@ SURAHS = [
 ]
 
 
-# ===== إدارة المستخدمين =====
 def load_users():
     try:
         with open(USERS_FILE, "r") as f:
@@ -71,15 +70,45 @@ def save_user(user_id, username, full_name):
         json.dump(users, f, ensure_ascii=False, indent=2)
 
 
-# ===== بناء الأزرار =====
-def build_keyboard(items, cols, prefix):
+def build_surah_keyboard(page=1):
+    if page == 1:
+        surahs_slice = SURAHS[:57]
+        start_idx = 1
+    else:
+        surahs_slice = SURAHS[57:]
+        start_idx = 58
+
     keyboard = []
     row = []
-    for i, item in enumerate(items):
-        label = item if isinstance(item, str) else item[0]
-        idx = i + 1 if prefix == "surah_" else i
-        row.append(InlineKeyboardButton(label, callback_data=f"{prefix}{idx}"))
-        if len(row) == cols:
+    for i, name in enumerate(surahs_slice):
+        num = start_idx + i
+        row.append(InlineKeyboardButton(f"{num}. {name}", callback_data=f"surah_{num}"))
+        if len(row) == 4:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+
+    if page == 1:
+        nav = [
+            InlineKeyboardButton("🔍 بحث عن سورة", callback_data="search"),
+            InlineKeyboardButton("التالي ◀️", callback_data="page_2"),
+        ]
+    else:
+        nav = [
+            InlineKeyboardButton("▶️ السابق", callback_data="page_1"),
+            InlineKeyboardButton("🔍 بحث عن سورة", callback_data="search"),
+        ]
+    keyboard.append(nav)
+    return keyboard
+
+
+def build_readers_keyboard():
+    keyboard = []
+    row = []
+    for i, (name, _) in enumerate(READERS_LIST):
+        row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
+        if len(row) == 3:
             keyboard.append(row)
             row = []
     if row:
@@ -87,20 +116,15 @@ def build_keyboard(items, cols, prefix):
     return keyboard
 
 
-# ===== الأوامر =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     save_user(user.id, user.username, user.full_name)
     context.user_data["searching"] = False
 
     await update.message.reply_text(WELCOME_MESSAGE)
-
-    keyboard = build_keyboard(SURAHS, 4, "surah_")
-    keyboard.append([InlineKeyboardButton("🔍 بحث عن سورة", callback_data="search")])
-
     await update.message.reply_text(
-        "📖 اختر السورة أو ابحث عنها:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        "📖 اختر السورة — الصفحة 1 (1-57):",
+        reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1))
     )
 
 
@@ -120,17 +144,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("searching"):
         return
 
-    query = update.message.text.strip()
+    query_text = update.message.text.strip()
     context.user_data["searching"] = False
 
     results = [
         (i + 1, name) for i, name in enumerate(SURAHS)
-        if query in name
+        if query_text in name
     ]
 
     if not results:
         await update.message.reply_text(
-            f"❌ لم أجد سورة باسم *{query}*\n\nجرّب اسماً آخر أو اكتب /start للقائمة الكاملة.",
+            f"❌ لم أجد سورة باسم *{query_text}*\n\nجرّب اسماً آخر أو اكتب /start للقائمة الكاملة.",
             parse_mode="Markdown"
         )
         return
@@ -140,7 +164,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for num, name in results
     ]
     await update.message.reply_text(
-        f"🔍 نتائج البحث عن *{query}*:",
+        f"🔍 نتائج البحث عن *{query_text}*:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -151,23 +175,33 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
-    if data == "search":
+    if data == "page_1":
+        await query.edit_message_text(
+            "📖 اختر السورة — الصفحة 1 (1-57):",
+            reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1))
+        )
+
+    elif data == "page_2":
+        await query.edit_message_text(
+            "📖 اختر السورة — الصفحة 2 (58-114):",
+            reply_markup=InlineKeyboardMarkup(build_surah_keyboard(2))
+        )
+
+    elif data == "search":
         context.user_data["searching"] = True
         await query.message.reply_text(
             "🔍 اكتب اسم السورة أو جزء منه:\n\nمثال: *كهف* أو *بقرة*",
             parse_mode="Markdown"
         )
-        return
 
-    if data.startswith("surah_"):
+    elif data.startswith("surah_"):
         surah_num = data.split("_")[1]
         context.user_data["surah"] = surah_num
         context.user_data["searching"] = False
         surah_name = SURAHS[int(surah_num) - 1]
-        keyboard = build_keyboard(READERS_LIST, 3, "reader_")
         await query.edit_message_text(
             f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            reply_markup=InlineKeyboardMarkup(build_readers_keyboard()),
             parse_mode="Markdown"
         )
 
