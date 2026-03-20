@@ -257,7 +257,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         audio_url = get_audio_url(reader_id, surah_num)
         logging.info(f"Fetching: {audio_url}")
         try:
-            await query.message.reply_voice(
+            await query.message.reply_audio(
                 voice=audio_url,
                 caption=f"سورة *{surah_name}* — {reader_name}\n\n/start لسورة اخرى",
                 parse_mode="Markdown"
