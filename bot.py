@@ -2,12 +2,12 @@ import os
 import json
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
-ADMIN_ID = os.environ.get("ADMIN_ID")  # ضع ID حسابك في تيليغرام
+ADMIN_ID = os.environ.get("ADMIN_ID")
 USERS_FILE = "users.json"
 
 WELCOME_MESSAGE = """🌙 أهلاً وسهلاً بك في بوت القرآن الكريم 🌙
@@ -66,15 +66,9 @@ def load_users():
 
 def save_user(user_id, username, full_name):
     users = load_users()
-    users[str(user_id)] = {
-        "username": username,
-        "name": full_name,
-    }
+    users[str(user_id)] = {"username": username, "name": full_name}
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
-
-def get_users_count():
-    return len(load_users())
 
 
 # ===== بناء الأزرار =====
@@ -97,11 +91,15 @@ def build_keyboard(items, cols, prefix):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     save_user(user.id, user.username, user.full_name)
+    context.user_data["searching"] = False
 
     await update.message.reply_text(WELCOME_MESSAGE)
+
     keyboard = build_keyboard(SURAHS, 4, "surah_")
+    keyboard.append([InlineKeyboardButton("🔍 بحث عن سورة", callback_data="search")])
+
     await update.message.reply_text(
-        "📖 اختر السورة:",
+        "📖 اختر السورة أو ابحث عنها:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -111,11 +109,39 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if ADMIN_ID and user_id != ADMIN_ID:
         await update.message.reply_text("⛔ هذا الأمر للمشرف فقط.")
         return
-
-    count = get_users_count()
+    count = len(load_users())
     await update.message.reply_text(
-        f"📊 *إحصائيات البوت*\n\n"
-        f"👥 عدد المستخدمين: *{count}*",
+        f"📊 *إحصائيات البوت*\n\n👥 عدد المستخدمين: *{count}*",
+        parse_mode="Markdown"
+    )
+
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get("searching"):
+        return
+
+    query = update.message.text.strip()
+    context.user_data["searching"] = False
+
+    results = [
+        (i + 1, name) for i, name in enumerate(SURAHS)
+        if query in name
+    ]
+
+    if not results:
+        await update.message.reply_text(
+            f"❌ لم أجد سورة باسم *{query}*\n\nجرّب اسماً آخر أو اكتب /start للقائمة الكاملة.",
+            parse_mode="Markdown"
+        )
+        return
+
+    keyboard = [
+        [InlineKeyboardButton(f"{num}. {name}", callback_data=f"surah_{num}")]
+        for num, name in results
+    ]
+    await update.message.reply_text(
+        f"🔍 نتائج البحث عن *{query}*:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
 
@@ -125,9 +151,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
+    if data == "search":
+        context.user_data["searching"] = True
+        await query.message.reply_text(
+            "🔍 اكتب اسم السورة أو جزء منه:\n\nمثال: *كهف* أو *بقرة*",
+            parse_mode="Markdown"
+        )
+        return
+
     if data.startswith("surah_"):
         surah_num = data.split("_")[1]
         context.user_data["surah"] = surah_num
+        context.user_data["searching"] = False
         surah_name = SURAHS[int(surah_num) - 1]
         keyboard = build_keyboard(READERS_LIST, 3, "reader_")
         await query.edit_message_text(
@@ -157,7 +192,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             logging.error(f"Error: {e}")
-            await query.message.reply_text("تعذر التحميل، السورة غير متوفرة لهذا القارئ.\n/start للبدء من جديد")
+            await query.message.reply_text(
+                "تعذر التحميل، السورة غير متوفرة لهذا القارئ.\n/start للبدء من جديد"
+            )
 
 
 if __name__ == "__main__":
@@ -165,4 +202,5 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.run_polling()
