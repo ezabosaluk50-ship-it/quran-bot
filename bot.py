@@ -15,7 +15,6 @@ WELCOME_MESSAGE = """🌙 أهلاً وسهلاً بك في بوت القرآن 
 🤍 نسأل الله أن يجعل هذا العمل صدقة جارية لنا ولكم، وأن يرزقنا وإياكم حب القرآن والعمل به
 🎧 ابدأ الآن واستمع لكلام الله بصوتك المفضل"""
 
-# القراء المختارين مع معرفاتهم من API الرسمي
 SELECTED_READERS = {
     "مشاري العفاسي":        10,
     "ماهر المعيقلي":        69,
@@ -53,17 +52,16 @@ SURAHS = [
     "الإخلاص","الفلق","الناس"
 ]
 
-# كاش للقراء
 READERS_CACHE = {}
 
 def get_reader_server(reader_id):
     if reader_id in READERS_CACHE:
         return READERS_CACHE[reader_id]
     try:
-        url = f"https://www.mp3quran.net/api/v3/reciters?language=ar&reciter={reader_id}&rewaya=1"
+        url = f"https://www.mp3quran.net/api/v3/reciters?language=ar&reciter={reader_id}"
         r = requests.get(url, timeout=10)
         data = r.json()
-        if data.get("reciters"):
+        if data.get("reciters") and data["reciters"][0].get("moshaf"):
             server = data["reciters"][0]["moshaf"][0]["server"]
             READERS_CACHE[reader_id] = server
             return server
