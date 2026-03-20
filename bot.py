@@ -14,7 +14,6 @@ WELCOME_MESSAGE = """🌙 أهلاً وسهلاً بك في بوت القرآن 
 🤍 نسأل الله أن يجعل هذا العمل صدقة جارية لنا ولكم، وأن يرزقنا وإياكم حب القرآن والعمل به
 🎧 ابدأ الآن واستمع لكلام الله بصوتك المفضل"""
 
-# روابط مباشرة من API الرسمي mp3quran.net
 READERS_LIST = [
     ("مشاري العفاسي",        "https://server8.mp3quran.net/afs/"),
     ("ماهر المعيقلي",        "https://server12.mp3quran.net/maher/"),
@@ -70,9 +69,7 @@ def build_keyboard(items, cols, prefix):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("visited"):
-        context.user_data["visited"] = True
-        await update.message.reply_text(WELCOME_MESSAGE)
+    await update.message.reply_text(WELCOME_MESSAGE)
     keyboard = build_keyboard(SURAHS, 4, "surah_")
     await update.message.reply_text(
         "📖 اختر السورة:",
