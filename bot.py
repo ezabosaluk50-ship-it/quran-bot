@@ -1,5 +1,6 @@
 import os
 import logging
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -7,24 +8,24 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# (اسم, معرف, مصدر) المصدر: q=quranicaudio, m=mp3quran
+# القراء مع روابطهم الصحيحة من mp3quran.net
 READERS_LIST = [
-    ("مشاري العفاسي",        "mishaari_raashid_al_3afaasee", "q"),
-    ("ماهر المعيقلي",        "maher_al_muaiqly",             "q"),
-    ("عبد الباسط عبد الصمد", "abdul_basit_murattal",         "q"),
-    ("عبد الرحمن السديس",    "abdurrahmaan_as-sudais",       "q"),
-    ("سعد الغامدي",          "sa3d_al-ghaamidi",             "q"),
-    ("ناصر القطامي",         "naasir_al-qataami",            "q"),
-    ("ياسر الدوسري",         "yasser_ad-dussary",            "q"),
-    ("إدريس أبكر",           "idrees_abkar",                 "q"),
-    ("محمد صديق المنشاوي",   "muhammad_siddeeq_al-minshaawee", "q"),
-    ("محمود خليل الحصري",    "mahmood_khaleel_al-husaree",   "q"),
-    ("علي عبد الله جابر",    "ali_abdallah_jabir",           "q"),
-    ("أحمد العجمي",          "ahmed_ibn_ali_al-ajamy",       "q"),
-    ("خالد الجليل",          "khaalid_al-qahtaanee",         "q"),
-    ("فارس عباد",            "fares_abbad",                  "q"),
-    ("هاني الرفاعي",         "haani_ar-rifaa3i",             "q"),
-    ("إسلام صبحي",           "islam",                        "m"),
+    ("مشاري العفاسي",        "https://server8.mp3quran.net/afs/"),
+    ("ماهر المعيقلي",        "https://server8.mp3quran.net/maher/"),
+    ("عبد الباسط عبد الصمد", "https://server7.mp3quran.net/basit/"),
+    ("عبد الرحمن السديس",    "https://server11.mp3quran.net/sds/"),
+    ("سعد الغامدي",          "https://server7.mp3quran.net/s_gmd/"),
+    ("ناصر القطامي",         "https://server8.mp3quran.net/qtm/"),
+    ("ياسر الدوسري",         "https://server11.mp3quran.net/yasser/"),
+    ("إدريس أبكر",           "https://server13.mp3quran.net/abkr/"),
+    ("محمد صديق المنشاوي",   "https://server10.mp3quran.net/minsh/"),
+    ("محمود خليل الحصري",    "https://server7.mp3quran.net/husr/"),
+    ("أحمد العجمي",          "https://server11.mp3quran.net/ajm/"),
+    ("خالد الجليل",          "https://server8.mp3quran.net/jlil/"),
+    ("فارس عباد",            "https://server7.mp3quran.net/frs/"),
+    ("هاني الرفاعي",         "https://server8.mp3quran.net/hani/"),
+    ("إسلام صبحي",           "https://server10.mp3quran.net/islam/"),
+    ("علي الحذيفي",          "https://server11.mp3quran.net/a_hzfy/"),
 ]
 
 SURAHS = [
@@ -74,7 +75,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         surah_name = SURAHS[int(surah_num) - 1]
         keyboard = [
             [InlineKeyboardButton(name, callback_data=f"reader_{i}")]
-            for i, (name, _, _src) in enumerate(READERS_LIST)
+            for i, (name, _) in enumerate(READERS_LIST)
         ]
         await query.edit_message_text(
             f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
@@ -84,7 +85,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("reader_"):
         reader_index = int(data.split("_")[1])
-        reader_name, reader_id, source = READERS_LIST[reader_index]
+        reader_name, server_url = READERS_LIST[reader_index]
         surah_num = context.user_data.get("surah", "1")
         surah_name = SURAHS[int(surah_num) - 1]
 
@@ -93,12 +94,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
         surah_str = str(surah_num).zfill(3)
-
-        if source == "m":
-            audio_url = f"https://server10.mp3quran.net/{reader_id}/{surah_str}.mp3"
-        else:
-            audio_url = f"https://download.quranicaudio.com/quran/{reader_id}/{surah_str}.mp3"
-
+        audio_url = f"{server_url}{surah_str}.mp3"
         logging.info(f"Fetching: {audio_url}")
         try:
             await query.message.reply_voice(
@@ -108,7 +104,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             logging.error(f"Error: {e}")
-            await query.message.reply_text("تعذر التحميل.\n/start للبدء من جديد")
+            await query.message.reply_text("تعذر التحميل، السورة غير متوفرة لهذا القارئ.\n/start للبدء من جديد")
 
 
 if __name__ == "__main__":
