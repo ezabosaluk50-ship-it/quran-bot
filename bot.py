@@ -65,9 +65,11 @@ def load_users():
 
 def save_user(user_id, username, full_name):
     users = load_users()
+    is_new = str(user_id) not in users
     users[str(user_id)] = {"username": username, "name": full_name}
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
+    return is_new
 
 
 def build_surah_keyboard(page=1):
@@ -118,10 +120,13 @@ def build_readers_keyboard():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    save_user(user.id, user.username, user.full_name)
+    is_new = save_user(user.id, user.username, user.full_name)
     context.user_data["searching"] = False
 
-    await update.message.reply_text(WELCOME_MESSAGE)
+    # رسالة الترحيب للمستخدم الجديد فقط
+    if is_new:
+        await update.message.reply_text(WELCOME_MESSAGE)
+
     await update.message.reply_text(
         "📖 اختر السورة — الصفحة 1 (1-57):",
         reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1))
