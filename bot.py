@@ -164,8 +164,7 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
         [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")],
         [KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")],
     ],
-    resize_keyboard=True,
-    persistent=True
+    resize_keyboard=True
 )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
