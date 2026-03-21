@@ -297,7 +297,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         audio_url = f"{server_url}{surah_str}.mp3"
         caption = f"سورة *{surah_name}* — {reader_name}\n\n/start لسورة اخرى"
         success = await send_audio(context, query.message.chat_id, audio_url, caption)
-        if not success:
+        if success:
+            me = await context.bot.get_me()
+            share_text = f"استمع لسورة {surah_name} بصوت {reader_name} 🎧"
+            share_link = f"https://t.me/share/url?url=https://t.me/{me.username}&text={share_text}"
+            keyboard = [[InlineKeyboardButton("📤 شارك السورة", url=share_link)]]
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"📖 *{surah_name}* — {reader_name}",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        else:
             await query.message.reply_text("تعذر التحميل.\n/start للبدء من جديد")
 
 
