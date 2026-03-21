@@ -214,9 +214,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["surah"] = str(surah_num)
         surah_name = SURAHS[surah_num - 1]
         await update.message.reply_text(
-            f"🎲 *سورة عشوائية: {surah_name}*
-
-اختر القارئ:",
+            f"🎲 *سورة عشوائية: {surah_name}*\n\nاختر القارئ:",
             reply_markup=InlineKeyboardMarkup(build_readers_keyboard(update.effective_user.id)),
             parse_mode="Markdown"
         )
