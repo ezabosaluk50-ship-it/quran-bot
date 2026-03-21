@@ -222,9 +222,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "🔍 بحث عن سورة":
         context.user_data["searching"] = True
-        await update.message.reply_text("🔍 اكتب اسم السورة:
-
-مثال: *كهف* أو *بقرة*", parse_mode="Markdown")
+        await update.message.reply_text("🔍 اكتب اسم السورة:\n\nمثال: *كهف* أو *بقرة*", parse_mode="Markdown")
         return
 
     if text == "⭐ قارئي المفضل":
@@ -232,16 +230,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if favorite is not None:
             reader_name = READERS_LIST[favorite][0]
             await update.message.reply_text(
-                f"⭐ قارئك المفضل هو: *{reader_name}*
-
-اختر سورة للاستماع بصوته:",
+                f"⭐ قارئك المفضل هو: *{reader_name}*\n\nاختر سورة للاستماع بصوته:",
                 reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1)),
                 parse_mode="Markdown"
             )
         else:
-            await update.message.reply_text("لم تختر قارئاً مفضلاً بعد!
-
-اختر سورة واستمع لأي قارئ وسيُحفظ تلقائياً ⭐")
+            await update.message.reply_text("لم تختر قارئاً مفضلاً بعد!\n\nاختر سورة واستمع لأي قارئ وسيُحفظ تلقائياً ⭐")
         return
 
     if not context.user_data.get("searching"):
