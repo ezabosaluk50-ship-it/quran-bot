@@ -1,5 +1,6 @@
 import os
 import json
+import random
 import logging
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -103,9 +104,17 @@ def build_surah_keyboard(page=1):
     if row:
         keyboard.append(row)
     if page == 1:
-        nav = [InlineKeyboardButton("🔍 بحث", callback_data="search"), InlineKeyboardButton("التالي ◀️", callback_data="page_2")]
+        nav = [
+            InlineKeyboardButton("🎲 سورة عشوائية", callback_data="random"),
+            InlineKeyboardButton("🔍 بحث", callback_data="search"),
+            InlineKeyboardButton("التالي ◀️", callback_data="page_2"),
+        ]
     else:
-        nav = [InlineKeyboardButton("▶️ السابق", callback_data="page_1"), InlineKeyboardButton("🔍 بحث", callback_data="search")]
+        nav = [
+            InlineKeyboardButton("▶️ السابق", callback_data="page_1"),
+            InlineKeyboardButton("🎲 سورة عشوائية", callback_data="random"),
+            InlineKeyboardButton("🔍 بحث", callback_data="search"),
+        ]
     keyboard.append(nav)
     return keyboard
 
@@ -126,9 +135,7 @@ def build_readers_keyboard(user_id=None):
 
 
 async def send_audio(context, chat_id, audio_url, caption):
-    """يحاول يرسل الصوت بطريقتين"""
     try:
-        # الطريقة الأولى: تحميل الملف وإرساله
         response = requests.get(audio_url, timeout=30)
         if response.status_code == 200:
             await context.bot.send_voice(
@@ -140,9 +147,7 @@ async def send_audio(context, chat_id, audio_url, caption):
             return True
     except Exception as e:
         logging.error(f"Method 1 failed: {e}")
-
     try:
-        # الطريقة الثانية: إرسال الرابط مباشرة
         await context.bot.send_voice(
             chat_id=chat_id,
             voice=audio_url,
@@ -152,7 +157,6 @@ async def send_audio(context, chat_id, audio_url, caption):
         return True
     except Exception as e:
         logging.error(f"Method 2 failed: {e}")
-
     return False
 
 
@@ -205,17 +209,35 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "page_1":
         await query.edit_message_text("📖 اختر السورة — الصفحة 1 (1-57):", reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1)))
+
     elif data == "page_2":
         await query.edit_message_text("📖 اختر السورة — الصفحة 2 (58-114):", reply_markup=InlineKeyboardMarkup(build_surah_keyboard(2)))
+
+    elif data == "random":
+        surah_num = random.randint(1, 114)
+        context.user_data["surah"] = str(surah_num)
+        surah_name = SURAHS[surah_num - 1]
+        await query.edit_message_text(
+            f"🎲 *سورة عشوائية: {surah_name}*\n\nاختر القارئ:",
+            reply_markup=InlineKeyboardMarkup(build_readers_keyboard(user_id)),
+            parse_mode="Markdown"
+        )
+
     elif data == "search":
         context.user_data["searching"] = True
         await query.message.reply_text("🔍 اكتب اسم السورة:\n\nمثال: *كهف* أو *بقرة*", parse_mode="Markdown")
+
     elif data.startswith("surah_"):
         surah_num = data.split("_")[1]
         context.user_data["surah"] = surah_num
         context.user_data["searching"] = False
         surah_name = SURAHS[int(surah_num) - 1]
-        await query.edit_message_text(f"📖 *سورة {surah_name}*\n\nاختر القارئ:", reply_markup=InlineKeyboardMarkup(build_readers_keyboard(user_id)), parse_mode="Markdown")
+        await query.edit_message_text(
+            f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
+            reply_markup=InlineKeyboardMarkup(build_readers_keyboard(user_id)),
+            parse_mode="Markdown"
+        )
+
     elif data.startswith("reader_"):
         reader_index = int(data.split("_")[1])
         reader_name, server_url = READERS_LIST[reader_index]
