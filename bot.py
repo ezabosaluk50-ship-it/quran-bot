@@ -3,7 +3,7 @@ import json
 import random
 import logging
 import requests
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 logging.basicConfig(level=logging.INFO)
@@ -159,13 +159,24 @@ async def send_audio(context, chat_id, audio_url, caption):
     return False
 
 
+MAIN_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")],
+        [KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")],
+    ],
+    resize_keyboard=True,
+    persistent=True
+)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     is_new = save_user(user.id, user.username, user.full_name)
     context.user_data["searching"] = False
 
     if is_new:
-        await update.message.reply_text(WELCOME_MESSAGE)
+        await update.message.reply_text(WELCOME_MESSAGE, reply_markup=MAIN_KEYBOARD)
+    else:
+        await update.message.reply_text("مرحباً بعودتك! 🌙", reply_markup=MAIN_KEYBOARD)
 
     favorite = get_favorite_reader(user.id)
     if favorite is not None:
@@ -188,6 +199,53 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if text == "📖 اختر سورة":
+        await update.message.reply_text(
+            "📖 اختر السورة — الصفحة 1 (1-57):",
+            reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1))
+        )
+        return
+
+    if text == "🎲 سورة عشوائية":
+        import random
+        surah_num = random.randint(1, 114)
+        context.user_data["surah"] = str(surah_num)
+        surah_name = SURAHS[surah_num - 1]
+        await update.message.reply_text(
+            f"🎲 *سورة عشوائية: {surah_name}*
+
+اختر القارئ:",
+            reply_markup=InlineKeyboardMarkup(build_readers_keyboard(update.effective_user.id)),
+            parse_mode="Markdown"
+        )
+        return
+
+    if text == "🔍 بحث عن سورة":
+        context.user_data["searching"] = True
+        await update.message.reply_text("🔍 اكتب اسم السورة:
+
+مثال: *كهف* أو *بقرة*", parse_mode="Markdown")
+        return
+
+    if text == "⭐ قارئي المفضل":
+        favorite = get_favorite_reader(update.effective_user.id)
+        if favorite is not None:
+            reader_name = READERS_LIST[favorite][0]
+            await update.message.reply_text(
+                f"⭐ قارئك المفضل هو: *{reader_name}*
+
+اختر سورة للاستماع بصوته:",
+                reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1)),
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text("لم تختر قارئاً مفضلاً بعد!
+
+اختر سورة واستمع لأي قارئ وسيُحفظ تلقائياً ⭐")
+        return
+
     if not context.user_data.get("searching"):
         return
     query_text = update.message.text.strip()
