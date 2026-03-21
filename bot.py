@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
@@ -91,7 +92,6 @@ def build_surah_keyboard(page=1):
     else:
         surahs_slice = SURAHS[57:]
         start_idx = 58
-
     keyboard = []
     row = []
     for i, name in enumerate(surahs_slice):
@@ -102,17 +102,10 @@ def build_surah_keyboard(page=1):
             row = []
     if row:
         keyboard.append(row)
-
     if page == 1:
-        nav = [
-            InlineKeyboardButton("🔍 بحث عن سورة", callback_data="search"),
-            InlineKeyboardButton("التالي ◀️", callback_data="page_2"),
-        ]
+        nav = [InlineKeyboardButton("🔍 بحث", callback_data="search"), InlineKeyboardButton("التالي ◀️", callback_data="page_2")]
     else:
-        nav = [
-            InlineKeyboardButton("▶️ السابق", callback_data="page_1"),
-            InlineKeyboardButton("🔍 بحث عن سورة", callback_data="search"),
-        ]
+        nav = [InlineKeyboardButton("▶️ السابق", callback_data="page_1"), InlineKeyboardButton("🔍 بحث", callback_data="search")]
     keyboard.append(nav)
     return keyboard
 
@@ -132,6 +125,37 @@ def build_readers_keyboard(user_id=None):
     return keyboard
 
 
+async def send_audio(context, chat_id, audio_url, caption):
+    """يحاول يرسل الصوت بطريقتين"""
+    try:
+        # الطريقة الأولى: تحميل الملف وإرساله
+        response = requests.get(audio_url, timeout=30)
+        if response.status_code == 200:
+            await context.bot.send_voice(
+                chat_id=chat_id,
+                voice=response.content,
+                caption=caption,
+                parse_mode="Markdown"
+            )
+            return True
+    except Exception as e:
+        logging.error(f"Method 1 failed: {e}")
+
+    try:
+        # الطريقة الثانية: إرسال الرابط مباشرة
+        await context.bot.send_voice(
+            chat_id=chat_id,
+            voice=audio_url,
+            caption=caption,
+            parse_mode="Markdown"
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Method 2 failed: {e}")
+
+    return False
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     is_new = save_user(user.id, user.username, user.full_name)
@@ -143,10 +167,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     favorite = get_favorite_reader(user.id)
     if favorite is not None:
         reader_name = READERS_LIST[favorite][0]
-        await update.message.reply_text(
-            f"⭐ قارئك المفضل: *{reader_name}*",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text(f"⭐ قارئك المفضل: *{reader_name}*", parse_mode="Markdown")
 
     await update.message.reply_text(
         "📖 اختر السورة — الصفحة 1 (1-57):",
@@ -160,40 +181,20 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ هذا الأمر للمشرف فقط.")
         return
     count = len(load_users())
-    await update.message.reply_text(
-        f"📊 *إحصائيات البوت*\n\n👥 عدد المستخدمين: *{count}*",
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(f"📊 *إحصائيات البوت*\n\n👥 عدد المستخدمين: *{count}*", parse_mode="Markdown")
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("searching"):
         return
-
     query_text = update.message.text.strip()
     context.user_data["searching"] = False
-
-    results = [
-        (i + 1, name) for i, name in enumerate(SURAHS)
-        if query_text in name
-    ]
-
+    results = [(i + 1, name) for i, name in enumerate(SURAHS) if query_text in name]
     if not results:
-        await update.message.reply_text(
-            f"❌ لم أجد سورة باسم *{query_text}*\n\nجرّب اسماً آخر أو اكتب /start للقائمة الكاملة.",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text(f"❌ لم أجد سورة باسم *{query_text}*\n\n/start للقائمة الكاملة.", parse_mode="Markdown")
         return
-
-    keyboard = [
-        [InlineKeyboardButton(f"{num}. {name}", callback_data=f"surah_{num}")]
-        for num, name in results
-    ]
-    await update.message.reply_text(
-        f"🔍 نتائج البحث عن *{query_text}*:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    keyboard = [[InlineKeyboardButton(f"{num}. {name}", callback_data=f"surah_{num}")] for num, name in results]
+    await update.message.reply_text(f"🔍 نتائج البحث عن *{query_text}*:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -203,62 +204,31 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     if data == "page_1":
-        await query.edit_message_text(
-            "📖 اختر السورة — الصفحة 1 (1-57):",
-            reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1))
-        )
-
+        await query.edit_message_text("📖 اختر السورة — الصفحة 1 (1-57):", reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1)))
     elif data == "page_2":
-        await query.edit_message_text(
-            "📖 اختر السورة — الصفحة 2 (58-114):",
-            reply_markup=InlineKeyboardMarkup(build_surah_keyboard(2))
-        )
-
+        await query.edit_message_text("📖 اختر السورة — الصفحة 2 (58-114):", reply_markup=InlineKeyboardMarkup(build_surah_keyboard(2)))
     elif data == "search":
         context.user_data["searching"] = True
-        await query.message.reply_text(
-            "🔍 اكتب اسم السورة أو جزء منه:\n\nمثال: *كهف* أو *بقرة*",
-            parse_mode="Markdown"
-        )
-
+        await query.message.reply_text("🔍 اكتب اسم السورة:\n\nمثال: *كهف* أو *بقرة*", parse_mode="Markdown")
     elif data.startswith("surah_"):
         surah_num = data.split("_")[1]
         context.user_data["surah"] = surah_num
         context.user_data["searching"] = False
         surah_name = SURAHS[int(surah_num) - 1]
-        await query.edit_message_text(
-            f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
-            reply_markup=InlineKeyboardMarkup(build_readers_keyboard(user_id)),
-            parse_mode="Markdown"
-        )
-
+        await query.edit_message_text(f"📖 *سورة {surah_name}*\n\nاختر القارئ:", reply_markup=InlineKeyboardMarkup(build_readers_keyboard(user_id)), parse_mode="Markdown")
     elif data.startswith("reader_"):
         reader_index = int(data.split("_")[1])
         reader_name, server_url = READERS_LIST[reader_index]
         surah_num = context.user_data.get("surah", "1")
         surah_name = SURAHS[int(surah_num) - 1]
-
         save_favorite_reader(user_id, reader_index)
-
-        await query.edit_message_text(
-            f"⏳ جاري تحميل سورة *{surah_name}* بصوت *{reader_name}*...",
-            parse_mode="Markdown"
-        )
-
+        await query.edit_message_text(f"⏳ جاري تحميل سورة *{surah_name}* بصوت *{reader_name}*...", parse_mode="Markdown")
         surah_str = str(surah_num).zfill(3)
         audio_url = f"{server_url}{surah_str}.mp3"
-        logging.info(f"Fetching: {audio_url}")
-        try:
-            await query.message.reply_voice(
-                voice=audio_url,
-                caption=f"سورة *{surah_name}* — {reader_name}\n\n/start لسورة اخرى",
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logging.error(f"Error: {e}")
-            await query.message.reply_text(
-                "تعذر التحميل، السورة غير متوفرة لهذا القارئ.\n/start للبدء من جديد"
-            )
+        caption = f"سورة *{surah_name}* — {reader_name}\n\n/start لسورة اخرى"
+        success = await send_audio(context, query.message.chat_id, audio_url, caption)
+        if not success:
+            await query.message.reply_text("تعذر التحميل.\n/start للبدء من جديد")
 
 
 if __name__ == "__main__":
