@@ -104,18 +104,17 @@ def build_surah_keyboard(page=1):
     if row:
         keyboard.append(row)
     if page == 1:
-        nav = [
-            InlineKeyboardButton("🎲 سورة عشوائية", callback_data="random"),
+        keyboard.append([InlineKeyboardButton("🎲 سورة عشوائية", callback_data="random")])
+        keyboard.append([
             InlineKeyboardButton("🔍 بحث", callback_data="search"),
             InlineKeyboardButton("التالي ◀️", callback_data="page_2"),
-        ]
+        ])
     else:
-        nav = [
+        keyboard.append([InlineKeyboardButton("🎲 سورة عشوائية", callback_data="random")])
+        keyboard.append([
             InlineKeyboardButton("▶️ السابق", callback_data="page_1"),
-            InlineKeyboardButton("🎲 سورة عشوائية", callback_data="random"),
             InlineKeyboardButton("🔍 بحث", callback_data="search"),
-        ]
-    keyboard.append(nav)
+        ])
     return keyboard
 
 
