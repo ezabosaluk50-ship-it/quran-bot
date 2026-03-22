@@ -139,7 +139,10 @@ async def send_audio(context, chat_id, audio_url, caption):
             chat_id=chat_id,
             voice=audio_url,
             caption=caption,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            read_timeout=120,
+            write_timeout=120,
+            connect_timeout=30,
         )
         return True
     except Exception as e:
