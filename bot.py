@@ -135,18 +135,6 @@ def build_readers_keyboard(user_id=None):
 
 async def send_audio(context, chat_id, audio_url, caption):
     try:
-        response = requests.get(audio_url, timeout=30)
-        if response.status_code == 200:
-            await context.bot.send_voice(
-                chat_id=chat_id,
-                voice=response.content,
-                caption=caption,
-                parse_mode="Markdown"
-            )
-            return True
-    except Exception as e:
-        logging.error(f"Method 1 failed: {e}")
-    try:
         await context.bot.send_voice(
             chat_id=chat_id,
             voice=audio_url,
@@ -155,7 +143,7 @@ async def send_audio(context, chat_id, audio_url, caption):
         )
         return True
     except Exception as e:
-        logging.error(f"Method 2 failed: {e}")
+        logging.error(f"Direct URL failed: {e}")
     return False
 
 
