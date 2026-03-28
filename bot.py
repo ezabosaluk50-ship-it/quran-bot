@@ -12,14 +12,6 @@ logging.basicConfig(level=logging.INFO)
 TOKEN = os.environ.get("BOT_TOKEN")
 USERS_FILE = "users.json"
 
-# رسالة الترحيب الخاصة بك
-WELCOME_MESSAGE = """🌙 أهلاً بك في بوت القرآن الكريم 🌙
-🤍 استمع للقرآن الكريم بصوت نخبة من القرّاء في أي وقت
-📖 اختر القارئ واستمتع بالتلاوة بخشوع
-🎧 البوت يعمل في الخلفية لتستمر بالتصفح والاستماع معًا
-📖 قال تعالى: "ألا بذكر الله تطمئن القلوب"
-✨ شارك البوت لتكسب الأجر 🤲"""
-
 SURAHS = [
     "الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف",
     "الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر",
@@ -53,42 +45,43 @@ READERS_LIST = [
     ("خالد الجليل",    "https://server10.mp3quran.net/jleel/")
 ]
 
-# --- لوحة التحكم السفلية ---
 MAIN_KEYBOARD = ReplyKeyboardMarkup([
     [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")],
     [KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")]
 ], resize_keyboard=True)
 
-# --- وظائف المساعدة ---
-def load_users():
-    if os.path.exists(USERS_FILE):
-        try:
+# وظائف حفظ البيانات (محسنة)
+def save_user_fav(user_id, r_idx):
+    try:
+        data = {}
+        if os.path.exists(USERS_FILE):
             with open(USERS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except: return {}
-    return {}
+                data = json.load(f)
+        data[str(user_id)] = {"fav": r_idx}
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"Save error: {e}")
 
-def save_user(user_id, fav=None):
-    users = load_users()
-    u_id = str(user_id)
-    if u_id not in users: users[u_id] = {"fav": None}
-    if fav is not None: users[u_id]["fav"] = fav
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False)
+def get_user_fav(user_id):
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get(str(user_id), {}).get("fav")
+    return None
 
 def get_surah_kb(page=1):
-    start_idx = 1 if page == 1 else 58
-    end_idx = 58 if page == 1 else 115
+    start = 1 if page == 1 else 58
+    end = 58 if page == 1 else 115
     keyboard = []
     row = []
-    for i in range(start_idx, end_idx):
+    for i in range(start, end):
         row.append(InlineKeyboardButton(f"{i}. {SURAHS[i-1]}", callback_data=f"s_{i}"))
         if len(row) == 3:
             keyboard.append(row)
             row = []
     if row: keyboard.append(row)
-    nav = [InlineKeyboardButton("التالي ◀️" if page==1 else "▶️ السابق", callback_data=f"p_{2 if page==1 else 1}")]
-    keyboard.append(nav)
+    keyboard.append([InlineKeyboardButton("التالي ◀️" if page==1 else "▶️ السابق", callback_data=f"p_{2 if page==1 else 1}")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_readers_kb():
@@ -96,16 +89,14 @@ def get_readers_kb():
     row = []
     for i, (name, _) in enumerate(READERS_LIST):
         row.append(InlineKeyboardButton(name, callback_data=f"r_{i}"))
-        if len(row) == 3: # ترتيب 3 قراء في كل سطر
+        if len(row) == 3:
             keyboard.append(row)
             row = []
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
-# --- المحركات الأساسية ---
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    save_user(update.effective_user.id)
-    await update.message.reply_text(WELCOME_MESSAGE, reply_markup=MAIN_KEYBOARD)
+    await update.message.reply_text("🌙 أهلاً بك في بوت القرآن الكريم\n\nاستخدم القائمة بالأسفل للتنقل", reply_markup=MAIN_KEYBOARD)
     await update.message.reply_text("📖 اختر السورة المرجوة:", reply_markup=get_surah_kb(1))
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -113,21 +104,21 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     if text == "📖 اختر سورة":
-        await update.message.reply_text("📖 اختر السورة:", reply_markup=get_surah_kb(1))
+        await update.message.reply_text("📖 قائمة السور:", reply_markup=get_surah_kb(1))
     elif text == "🎲 سورة عشوائية":
         num = random.randint(1, 114)
         context.user_data["s"] = str(num)
-        await update.message.reply_text(f"🎲 سورة مختارة: {SURAHS[num-1]}\n🎙️ اختر القارئ الآن:", reply_markup=get_readers_kb())
+        await update.message.reply_text(f"🎲 سورة مختارة: {SURAHS[num-1]}\n🎙️ اختر القارئ:", reply_markup=get_readers_kb())
     elif text == "🔍 بحث عن سورة":
         context.user_data["searching"] = True
-        await update.message.reply_text("🔍 اكتب اسم السورة التي تبحث عنها:")
+        await update.message.reply_text("🔍 اكتب اسم السورة (مثلاً: الكهف):")
     elif text == "⭐ قارئي المفضل":
-        users = load_users()
-        fav = users.get(str(user_id), {}).get("fav")
+        fav = get_user_fav(user_id)
         if fav is not None:
-            await update.message.reply_text(f"⭐ قارئك المفضل حالياً: {READERS_LIST[fav][0]}\n📖 اختر سورة للاستماع بصوته:", reply_markup=get_surah_kb(1))
+            reader_name = READERS_LIST[fav][0]
+            await update.message.reply_text(f"⭐ قارئك المفضل حالياً: {reader_name}\nقم باختيار السورة الآن:", reply_markup=get_surah_kb(1))
         else:
-            await update.message.reply_text("لم تختر قارئاً مفضلاً بعد. اختر سورة ثم قارئ وسيتم حفظه تلقائياً.")
+            await update.message.reply_text("❌ لم تختر قارئاً بعد. اختر سورة ثم قارئ وسيتم حفظه تلقائياً.")
     elif context.user_data.get("searching"):
         context.user_data["searching"] = False
         results = [(i+1, name) for i, name in enumerate(SURAHS) if text in name]
@@ -135,48 +126,47 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             btns = [[InlineKeyboardButton(f"{n}. {nm}", callback_data=f"s_{n}")] for n, nm in results]
             await update.message.reply_text(f"🔍 نتائج البحث عن '{text}':", reply_markup=InlineKeyboardMarkup(btns))
         else:
-            await update.message.reply_text("❌ لم أجد سورة بهذا الاسم.")
+            await update.message.reply_text("❌ لم يتم العثور على سورة بهذا الاسم.")
 
 async def cb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     data = q.data
-    user_id = update.effective_user.id
 
     if data.startswith("p_"):
         p = int(data.split("_")[1])
         await q.edit_message_text(f"📖 صفحة {p}:", reply_markup=get_surah_kb(p))
-    
     elif data.startswith("s_"):
         context.user_data["s"] = data.split("_")[1]
-        surah_name = SURAHS[int(context.user_data['s'])-1]
-        await q.edit_message_text(f"📖 سورة {surah_name}\n🎙️ اختر القارئ:", reply_markup=get_readers_kb())
-        
+        await q.edit_message_text(f"📖 سورة {SURAHS[int(context.user_data['s'])-1]}\n🎙️ اختر القارئ:", reply_markup=get_readers_kb())
     elif data.startswith("r_"):
         r_idx = int(data.split("_")[1])
         s_num = context.user_data.get("s", "1")
         r_name, url = READERS_LIST[r_idx]
-        save_user(user_id, r_idx)
+        save_user_fav(update.effective_user.id, r_idx)
         
-        msg = await q.edit_message_text(f"⏳ جاري تجهيز سورة {SURAHS[int(s_num)-1]} بصوت {r_name}...")
+        await q.edit_message_text(f"⏳ جاري تجهيز سورة {SURAHS[int(s_num)-1]} بصوت {r_name}...")
+        audio_url = f"{url}{s_num.zfill(3)}.mp3"
         
         try:
-            full_url = f"{url}{s_num.zfill(3)}.mp3"
+            # محاولة إرسال الملف الصوتي
             await context.bot.send_audio(
-                chat_id=q.message.chat_id, 
-                audio=full_url, 
-                title=SURAHS[int(s_num)-1], 
+                chat_id=q.message.chat_id,
+                audio=audio_url,
+                title=SURAHS[int(s_num)-1],
                 performer=r_name,
-                caption=f"✅ استماعاً طيباً\n🎙️ {r_name}\n\n/start للعودة"
+                timeout=120
             )
-            await msg.delete()
-        except:
-            await q.message.reply_text("❌ عذراً، تعذر الإرسال. قد يكون الملف كبيراً جداً أو الرابط مؤقتاً.")
+        except Exception as e:
+            # إذا فشل بسبب الحجم، نرسل رابط مباشر
+            logging.error(f"Send error: {e}")
+            await q.message.reply_text(
+                f"⚠️ السورة حجمها كبير جداً على تليجرام.\n🎙️ القارئ: {r_name}\n📖 سورة: {SURAHS[int(s_num)-1]}\n\n⬇️ يمكنك الاستماع أو التحميل مباشرة من هنا:\n{audio_url}"
+            )
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CallbackQueryHandler(cb_handler))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), text_handler))
-    print("البوت يعمل الآن بنجاح...")
     app.run_polling()
