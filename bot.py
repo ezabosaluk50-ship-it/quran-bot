@@ -41,7 +41,7 @@ SURAHS = [
 READERS_LIST = [
     ("مشاري العفاسي",  "https://server8.mp3quran.net/afs/"),
     ("ماهر المعيقلي",  "https://server12.mp3quran.net/maher/"),
-    ("عبد الباسط (مرتل)", "https://server7.mp3quran.net/basit/"),
+    ("عبد الباسط",     "https://server7.mp3quran.net/basit/"),
     ("السديس",         "https://server11.mp3quran.net/sds/"),
     ("سعد الغامدي",    "https://server7.mp3quran.net/s_gmd/"),
     ("إسلام صبحي",     "https://server14.mp3quran.net/islam/"),
@@ -49,15 +49,17 @@ READERS_LIST = [
     ("إدريس أبكر",     "https://server6.mp3quran.net/abkr/"),
     ("أحمد العجمي",    "https://server10.mp3quran.net/ajm/"),
     ("فارس عباد",      "https://server8.mp3quran.net/frs_a/"),
+    ("ناصر القطامي",   "https://server6.mp3quran.net/qtm/"),
+    ("خالد الجليل",    "https://server10.mp3quran.net/jleel/")
 ]
 
-# --- لوحة التحكم السفلية (Main Menu) ---
+# --- لوحة التحكم السفلية ---
 MAIN_KEYBOARD = ReplyKeyboardMarkup([
     [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")],
     [KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")]
 ], resize_keyboard=True)
 
-# --- دوال المساعدة ---
+# --- وظائف المساعدة ---
 def load_users():
     if os.path.exists(USERS_FILE):
         try:
@@ -89,6 +91,17 @@ def get_surah_kb(page=1):
     keyboard.append(nav)
     return InlineKeyboardMarkup(keyboard)
 
+def get_readers_kb():
+    keyboard = []
+    row = []
+    for i, (name, _) in enumerate(READERS_LIST):
+        row.append(InlineKeyboardButton(name, callback_data=f"r_{i}"))
+        if len(row) == 3: # ترتيب 3 قراء في كل سطر
+            keyboard.append(row)
+            row = []
+    if row: keyboard.append(row)
+    return InlineKeyboardMarkup(keyboard)
+
 # --- المحركات الأساسية ---
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_user(update.effective_user.id)
@@ -104,8 +117,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "🎲 سورة عشوائية":
         num = random.randint(1, 114)
         context.user_data["s"] = str(num)
-        btns = [[InlineKeyboardButton(r[0], callback_data=f"r_{i}")] for i, r in enumerate(READERS_LIST)]
-        await update.message.reply_text(f"🎲 سورة مختارة: {SURAHS[num-1]}\n🎙️ اختر القارئ الآن:", reply_markup=InlineKeyboardMarkup(btns))
+        await update.message.reply_text(f"🎲 سورة مختارة: {SURAHS[num-1]}\n🎙️ اختر القارئ الآن:", reply_markup=get_readers_kb())
     elif text == "🔍 بحث عن سورة":
         context.user_data["searching"] = True
         await update.message.reply_text("🔍 اكتب اسم السورة التي تبحث عنها:")
@@ -137,14 +149,14 @@ async def cb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data.startswith("s_"):
         context.user_data["s"] = data.split("_")[1]
-        btns = [[InlineKeyboardButton(r[0], callback_data=f"r_{i}")] for i, r in enumerate(READERS_LIST)]
-        await q.edit_message_text(f"📖 سورة {SURAHS[int(context.user_data['s'])-1]}\n🎙️ اختر القارئ:", reply_markup=InlineKeyboardMarkup(btns))
+        surah_name = SURAHS[int(context.user_data['s'])-1]
+        await q.edit_message_text(f"📖 سورة {surah_name}\n🎙️ اختر القارئ:", reply_markup=get_readers_kb())
         
     elif data.startswith("r_"):
         r_idx = int(data.split("_")[1])
         s_num = context.user_data.get("s", "1")
         r_name, url = READERS_LIST[r_idx]
-        save_user(user_id, r_idx) # حفظ كقارئ مفضل
+        save_user(user_id, r_idx)
         
         msg = await q.edit_message_text(f"⏳ جاري تجهيز سورة {SURAHS[int(s_num)-1]} بصوت {r_name}...")
         
@@ -159,11 +171,12 @@ async def cb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             await msg.delete()
         except:
-            await q.message.reply_text("❌ عذراً، هذا الملف حجمه كبير جداً للإرسال المباشر أو الرابط معطل.")
+            await q.message.reply_text("❌ عذراً، تعذر الإرسال. قد يكون الملف كبيراً جداً أو الرابط مؤقتاً.")
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CallbackQueryHandler(cb_handler))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), text_handler))
+    print("البوت يعمل الآن بنجاح...")
     app.run_polling()
