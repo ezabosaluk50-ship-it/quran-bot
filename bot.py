@@ -2,72 +2,311 @@ import os
 import json
 import random
 import logging
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# إعداد السجلات لمراقبة الأخطاء
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
+ADMIN_ID = os.environ.get("ADMIN_ID")
+USERS_FILE = "users.json"
 
-# قائمة السور
-SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
+WELCOME_MESSAGE = """🌙 أهلاً بك في بوت القرآن الكريم 🌙
+🤍 استمع للقرآن الكريم بصوت نخبة من القرّاء في أي وقت
+📖 اختر القارئ واستمتع بالتلاوة بخشوع
+🎧 البوت يعمل في الخلفية لتستمر بالتصفح والاستماع معًا
+📖 قال تعالى: "ألا بذكر الله تطمئن القلوب"
+✨ شارك البوت لتكسب الأجر 🤲"""
 
-# قائمة القراء
 READERS_LIST = [
-    ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
-    ("ماهر المعيقلي", "https://server12.mp3quran.net/maher/"),
-    ("عبد الباسط", "https://server7.mp3quran.net/basit/"),
-    ("السديس", "https://server11.mp3quran.net/sds/"),
-    ("سعد الغامدي", "https://server7.mp3quran.net/s_gmd/"),
-    ("إسلام صبحي", "https://server14.mp3quran.net/islam/"),
-    ("ياسر الدوسري", "https://server11.mp3quran.net/yasser/"),
-    ("إدريس أبكر", "https://server6.mp3quran.net/abkr/"),
-    ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
-    ("فارس عباد", "https://server8.mp3quran.net/frs_a/"),
-    ("ناصر القطامي", "https://server6.mp3quran.net/qtm/"),
-    ("خالد الجليل", "https://server10.mp3quran.net/jleel/")
+    ("مشاري العفاسي",  "https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/"),
+    ("ماهر المعيقلي",  "https://server12.mp3quran.net/maher/"),
+    ("عبد الباسط",     "https://server7.mp3quran.net/basit/"),
+    ("السديس",         "https://server11.mp3quran.net/sds/"),
+    ("سعد الغامدي",    "https://server7.mp3quran.net/s_gmd/"),
+    ("ناصر القطامي",   "https://download.quranicaudio.com/quran/naasir_al-qataami/"),
+    ("ياسر الدوسري",   "https://download.quranicaudio.com/quran/yasser_ad-dussary/"),
+    ("إدريس أبكر",     "https://download.quranicaudio.com/quran/idrees_abkar/"),
+    ("المنشاوي",       "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/"),
+    ("الحصري",         "https://download.quranicaudio.com/quran/mahmood_khaleel_al-husaree/"),
+    ("أحمد العجمي",    "https://server10.mp3quran.net/ajm/"),
+    ("خالد الجليل",    "https://download.quranicaudio.com/quran/khaalid_al-qahtaanee/"),
+    ("فارس عباد",      "https://server8.mp3quran.net/frs_a/"),
+    ("هاني الرفاعي",   "https://server8.mp3quran.net/hani/"),
+    ("علي الحذيفي",    "https://server9.mp3quran.net/hthfi/"),
+    ("إسلام صبحي",     "https://portalquran.com/file/islam/"),
+    ("عبدالله الجهني", "https://download.quranicaudio.com/quran/abdullaah_3awwaad_al-juhaynee/"),
 ]
 
-# دالة لإنشاء أزرار القراء (3 في كل سطر)
-def get_readers_kb():
-    keyboard = []
-    for i in range(0, len(READERS_LIST), 3):
-        row = [InlineKeyboardButton(READERS_LIST[j][0], callback_data=f"r_{j}") for j in range(i, min(i + 3, len(READERS_LIST)))]
-        keyboard.append(row)
-    return InlineKeyboardMarkup(keyboard)
+SURAHS = [
+    "الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف",
+    "الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر",
+    "النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون",
+    "النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان",
+    "السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر",
+    "فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح",
+    "الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة",
+    "الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون",
+    "التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح",
+    "الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات",
+    "عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى",
+    "الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين",
+    "العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر",
+    "الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد",
+    "الإخلاص","الفلق","الناس"
+]
 
-# دالة لإنشاء أزرار السور
-def get_surah_kb(page=1):
-    start, end = (1, 58) if page == 1 else (58, 115)
+
+def load_users():
+    try:
+        with open(USERS_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_user(user_id, username, full_name):
+    users = load_users()
+    is_new = str(user_id) not in users
+    if is_new:
+        users[str(user_id)] = {"username": username, "name": full_name, "favorite_reader": None}
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+    return is_new
+
+def get_favorite_reader(user_id):
+    users = load_users()
+    return users.get(str(user_id), {}).get("favorite_reader")
+
+def save_favorite_reader(user_id, reader_index):
+    users = load_users()
+    if str(user_id) in users:
+        users[str(user_id)]["favorite_reader"] = reader_index
+        with open(USERS_FILE, "w") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+
+
+def build_surah_keyboard(page=1):
+    if page == 1:
+        surahs_slice = SURAHS[:57]
+        start_idx = 1
+    else:
+        surahs_slice = SURAHS[57:]
+        start_idx = 58
     keyboard = []
-    for i in range(start, end, 3):
-        row = [InlineKeyboardButton(f"{j}. {SURAHS[j-1]}", callback_data=f"s_{j}") for j in range(i, min(i + 3, end))]
+    row = []
+    for i, name in enumerate(surahs_slice):
+        num = start_idx + i
+        row.append(InlineKeyboardButton(f"{num}. {name}", callback_data=f"surah_{num}"))
+        if len(row) == 4:
+            keyboard.append(row)
+            row = []
+    if row:
         keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("التالي ◀️" if page==1 else "▶️ السابق", callback_data=f"p_{2 if page==1 else 1}")])
-    return InlineKeyboardMarkup(keyboard)
+    if page == 1:
+        keyboard.append([InlineKeyboardButton("🎲 سورة عشوائية", callback_data="random")])
+        keyboard.append([
+            InlineKeyboardButton("🔍 بحث", callback_data="search"),
+            InlineKeyboardButton("التالي ◀️", callback_data="page_2"),
+        ])
+    else:
+        keyboard.append([InlineKeyboardButton("🎲 سورة عشوائية", callback_data="random")])
+        keyboard.append([
+            InlineKeyboardButton("▶️ السابق", callback_data="page_1"),
+            InlineKeyboardButton("🔍 بحث", callback_data="search"),
+        ])
+    return keyboard
+
+
+def build_readers_keyboard(user_id=None):
+    favorite = get_favorite_reader(user_id) if user_id else None
+    keyboard = []
+    row = []
+    for i, (name, _) in enumerate(READERS_LIST):
+        label = f"⭐ {name}" if i == favorite else name
+        row.append(InlineKeyboardButton(label, callback_data=f"reader_{i}"))
+        if len(row) == 3:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    return keyboard
+
+
+async def send_audio(context, chat_id, audio_url, caption):
+    try:
+        await context.bot.send_voice(
+            chat_id=chat_id,
+            voice=audio_url,
+            caption=caption,
+            parse_mode="Markdown",
+            read_timeout=120,
+            write_timeout=120,
+            connect_timeout=30,
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Direct URL failed: {e}")
+    return False
+
+
+MAIN_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")],
+        [KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")],
+    ],
+    resize_keyboard=True
+)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    kb = ReplyKeyboardMarkup([["📖 اختر سورة", "🎲 سورة عشوائية"], ["🔍 بحث عن سورة", "⭐ قارئي المفضل"]], resize_keyboard=True)
-    await update.message.reply_text("✨ مرحباً بك في بوت القرآن الكريم\nاختر سورة للبدء:", reply_markup=kb)
-    await update.message.reply_text("📖 قائمة السور:", reply_markup=get_surah_kb(1))
+    user = update.effective_user
+    is_new = save_user(user.id, user.username, user.full_name)
+    context.user_data["searching"] = False
 
-async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if is_new:
+        await update.message.reply_text(WELCOME_MESSAGE, reply_markup=MAIN_KEYBOARD)
+    else:
+        await update.message.reply_text("مرحباً بعودتك! 🌙", reply_markup=MAIN_KEYBOARD)
+
+    favorite = get_favorite_reader(user.id)
+    if favorite is not None:
+        reader_name = READERS_LIST[favorite][0]
+        await update.message.reply_text(f"⭐ قارئك المفضل: *{reader_name}*", parse_mode="Markdown")
+
+    await update.message.reply_text(
+        "📖 اختر السورة — الصفحة 1 (1-57):",
+        reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1))
+    )
+
+
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if ADMIN_ID and user_id != ADMIN_ID:
+        await update.message.reply_text("⛔ هذا الأمر للمشرف فقط.")
+        return
+    count = len(load_users())
+    await update.message.reply_text(f"📊 *إحصائيات البوت*\n\n👥 عدد المستخدمين: *{count}*", parse_mode="Markdown")
+
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    user_id = update.effective_user.id
 
     if text == "📖 اختر سورة":
-        await update.message.reply_text("📖 اختر السورة:", reply_markup=get_surah_kb(1))
-    elif text == "🎲 سورة عشوائية":
-        n = random.randint(1, 114)
-        context.user_data["s"] = str(n)
-        await update.message.reply_text(f"🎲 سورة {SURAHS[n-1]}\n🎙️ اختر القارئ:", reply_markup=get_readers_kb())
-    elif text == "⭐ قارئي المفضل":
-        fav = context.user_data.get("fav_reader")
-        if fav is not None:
-            await update.message.reply_text(f"⭐ قارئك المفضل: {READERS_LIST[fav][0]}\n📖 اختر السورة الآن:", reply_markup=get_surah_kb(1))
-        else:
-            await update.message.reply_text("❌ لم تختر قارئاً بعد. اختر سورة ثم قارئ وسيتم حفظه تلقائياً.")
-    elif text == "🔍 بحث عن سورة":
+        await update.message.reply_text(
+            "📖 اختر السورة — الصفحة 1 (1-57):",
+            reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1))
+        )
+        return
+
+    if text == "🎲 سورة عشوائية":
+        import random
+        surah_num = random.randint(1, 114)
+        context.user_data["surah"] = str(surah_num)
+        surah_name = SURAHS[surah_num - 1]
+        await update.message.reply_text(
+            f"🎲 *سورة عشوائية: {surah_name}*\n\nاختر القارئ:",
+            reply_markup=InlineKeyboardMarkup(build_readers_keyboard(update.effective_user.id)),
+            parse_mode="Markdown"
+        )
+        return
+
+    if text == "🔍 بحث عن سورة":
         context.user_data["searching"] = True
-        await update.message.reply_text("🔍 اكتب اسم السورة:")
+        await update.message.reply_text("🔍 اكتب اسم السورة:\n\nمثال: *كهف* أو *بقرة*", parse_mode="Markdown")
+        return
+
+    if text == "⭐ قارئي المفضل":
+        favorite = get_favorite_reader(update.effective_user.id)
+        if favorite is not None:
+            reader_name = READERS_LIST[favorite][0]
+            await update.message.reply_text(
+                f"⭐ قارئك المفضل هو: *{reader_name}*\n\nاختر سورة للاستماع بصوته:",
+                reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1)),
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text("لم تختر قارئاً مفضلاً بعد!\n\nاختر سورة واستمع لأي قارئ وسيُحفظ تلقائياً ⭐")
+        return
+
+    if not context.user_data.get("searching"):
+        return
+    query_text = update.message.text.strip()
+    context.user_data["searching"] = False
+    results = [(i + 1, name) for i, name in enumerate(SURAHS) if query_text in name]
+    if not results:
+        await update.message.reply_text(f"❌ لم أجد سورة باسم *{query_text}*\n\n/start للقائمة الكاملة.", parse_mode="Markdown")
+        return
+    keyboard = [[InlineKeyboardButton(f"{num}. {name}", callback_data=f"surah_{num}")] for num, name in results]
+    await update.message.reply_text(f"🔍 نتائج البحث عن *{query_text}*:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    user_id = update.effective_user.id
+
+    if data == "page_1":
+        await query.edit_message_text("📖 اختر السورة — الصفحة 1 (1-57):", reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1)))
+
+    elif data == "page_2":
+        await query.edit_message_text("📖 اختر السورة — الصفحة 2 (58-114):", reply_markup=InlineKeyboardMarkup(build_surah_keyboard(2)))
+
+    elif data == "random":
+        surah_num = random.randint(1, 114)
+        context.user_data["surah"] = str(surah_num)
+        surah_name = SURAHS[surah_num - 1]
+        await query.edit_message_text(
+            f"🎲 *سورة عشوائية: {surah_name}*\n\nاختر القارئ:",
+            reply_markup=InlineKeyboardMarkup(build_readers_keyboard(user_id)),
+            parse_mode="Markdown"
+        )
+
+    elif data == "search":
+        context.user_data["searching"] = True
+        await query.message.reply_text("🔍 اكتب اسم السورة:\n\nمثال: *كهف* أو *بقرة*", parse_mode="Markdown")
+
+    elif data.startswith("surah_"):
+        surah_num = data.split("_")[1]
+        context.user_data["surah"] = surah_num
+        context.user_data["searching"] = False
+        surah_name = SURAHS[int(surah_num) - 1]
+        await query.edit_message_text(
+            f"📖 *سورة {surah_name}*\n\nاختر القارئ:",
+            reply_markup=InlineKeyboardMarkup(build_readers_keyboard(user_id)),
+            parse_mode="Markdown"
+        )
+
+    elif data.startswith("reader_"):
+        reader_index = int(data.split("_")[1])
+        reader_name, server_url = READERS_LIST[reader_index]
+        surah_num = context.user_data.get("surah", "1")
+        surah_name = SURAHS[int(surah_num) - 1]
+        save_favorite_reader(user_id, reader_index)
+        await query.edit_message_text(f"⏳ جاري تحميل سورة *{surah_name}* بصوت *{reader_name}*...", parse_mode="Markdown")
+        surah_str = str(surah_num).zfill(3)
+        audio_url = f"{server_url}{surah_str}.mp3"
+        caption = f"سورة *{surah_name}* — {reader_name}\n\n/start لسورة اخرى"
+        success = await send_audio(context, query.message.chat_id, audio_url, caption)
+        if success:
+            me = await context.bot.get_me()
+            share_text = f"استمع لسورة {surah_name} بصوت {reader_name} 🎧"
+            share_link = f"https://t.me/share/url?url=https://t.me/{me.username}&text={share_text}"
+            keyboard = [[InlineKeyboardButton("📤 شارك السورة", url=share_link)]]
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"📖 *{surah_name}* — {reader_name}",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        else:
+            await query.message.reply_text("تعذر التحميل.\n/start للبدء من جديد")
+
+
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.run_polling()
