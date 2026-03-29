@@ -133,11 +133,21 @@ def build_readers_keyboard(user_id=None):
     return keyboard
 
 
+import io
+
 async def send_audio(context, chat_id, audio_url, caption):
     try:
+        response = requests.get(audio_url, stream=True, timeout=60)
+
+        if response.status_code != 200:
+            return False
+
+        file = io.BytesIO(response.content)
+        file.name = "quran.mp3"
+
         await context.bot.send_document(
             chat_id=chat_id,
-            document=audio_url,
+            document=file,
             caption=caption,
             parse_mode="Markdown",
             read_timeout=300,
@@ -145,9 +155,10 @@ async def send_audio(context, chat_id, audio_url, caption):
             connect_timeout=60,
         )
         return True
+
     except Exception as e:
-        logging.error(f"Failed: {e}")
-    return False
+        logging.error(f"Download/Send failed: {e}")
+        return False
 
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
