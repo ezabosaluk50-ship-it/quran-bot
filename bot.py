@@ -133,60 +133,21 @@ def build_readers_keyboard(user_id=None):
     return keyboard
 
 
-# ✅✅✅ الدالة المعدلة الجديدة (هنا حل مشكلة السور الكبيرة) ✅✅✅
 async def send_audio(context, chat_id, audio_url, caption):
-    """
-    دالة ذكية: ترسل الملف مباشرة إذا كان صغيراً، 
-    أو ترسل الرابط إذا كان كبيراً (لتجاوز حد 50 ميجابايت)
-    """
     try:
-        # 1. فحص حجم الملف أولاً باستخدام طلب خفيف (HEAD)
-        head_resp = requests.head(audio_url, timeout=10, allow_redirects=True)
-        file_size = int(head_resp.headers.get('content-length', 0))
-        
-        # حد تلقرام للبوتات: 50 ميجابايت
-        MAX_BOT_SIZE = 50 * 1024 * 1024
-        
-        if file_size < MAX_BOT_SIZE and file_size > 0:
-            # ✅ الملف صغير: أرسله كصوتية مباشرة
-            await context.bot.send_voice(
-                chat_id=chat_id,
-                voice=audio_url,
-                caption=caption,
-                parse_mode="Markdown",
-                read_timeout=120,
-                write_timeout=120,
-                connect_timeout=30,
-            )
-            return True
-        else:
-            # ⚠️ الملف كبير: أرسل رابط التشغيل المباشر (يعمل كصوتية أيضاً)
-            # هذه الطريقة "سرعة البرق" ولا تستهلك موارد البوت
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🎧 استمع الآن", url=audio_url)]
-            ])
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"📖 {caption}\n\n⚠️ حجم السورة كبير، اضغط للاستماع المباشر:",
-                reply_markup=keyboard,
-                parse_mode="Markdown"
-            )
-            return True
-            
+        await context.bot.send_document(
+            chat_id=chat_id,
+            document=audio_url,
+            caption=caption,
+            parse_mode="Markdown",
+            read_timeout=300,
+            write_timeout=300,
+            connect_timeout=60,
+        )
+        return True
     except Exception as e:
-        logging.error(f"Error in send_audio: {e}")
-        # 2. حل احتياطي: إذا فشل أي شيء، أرسل الرابط كنص عادي
-        try:
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"📖 {caption}\n🔗 الرابط المباشر: {audio_url}",
-                parse_mode="Markdown",
-                disable_web_page_preview=True
-            )
-            return True
-        except:
-            return False
-# ✅✅✅ نهاية الدالة المعدلة ✅✅✅
+        logging.error(f"Failed: {e}")
+    return False
 
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
@@ -326,10 +287,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         surah_str = str(surah_num).zfill(3)
         audio_url = f"{server_url}{surah_str}.mp3"
         caption = f"سورة *{surah_name}* — {reader_name}\n\n/start لسورة اخرى"
-        
-        # ✅✅✅ هنا نستخدم الدالة الجديدة المعدلة ✅✅✅
         success = await send_audio(context, query.message.chat_id, audio_url, caption)
-        
         if success:
             me = await context.bot.get_me()
             share_text = f"استمع لسورة {surah_name} بصوت {reader_name} 🎧"
