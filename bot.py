@@ -7,34 +7,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKe
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 logging.basicConfig(level=logging.INFO)
-import requests, io
-
-# Dictionary to store file_ids
-FILES = {}
-
-async def ensure_file_id(context, chat_id):
-    # Check if already stored
-    if "005" not in FILES:
-        # Download the file once
-        url = "https://server6.mp3quran.net/abkr/005.mp3"
-        response = requests.get(url, stream=True, timeout=60)
-        if response.status_code == 200:
-            file = io.BytesIO(response.content)
-            file.name = "005.mp3"
-            msg = await context.bot.send_document(chat_id=chat_id, document=file)
-            FILES["005"] = msg.document.file_id
-        else:
-            await context.bot.send_message(chat_id=chat_id, text="❌ فشل تحميل السورة")
-
-async def send_surah_file(context, chat_id, surah_num, caption):
-    if str(surah_num).zfill(3) == "005":
-        await ensure_file_id(context, chat_id)
-    file_id = FILES.get(str(surah_num).zfill(3))
-    if file_id:
-        await context.bot.send_document(chat_id=chat_id, document=file_id, caption=caption, parse_mode="Markdown")
-    else:
-        await context.bot.send_message(chat_id=chat_id, text="⚠️ هذه السورة غير متوفرة حاليا")
-
 
 TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = os.environ.get("ADMIN_ID")
@@ -315,8 +287,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         surah_str = str(surah_num).zfill(3)
         audio_url = f"{server_url}{surah_str}.mp3"
         caption = f"سورة *{surah_name}* — {reader_name}\n\n/start لسورة اخرى"
-        await send_surah_file(context, query.message.chat_id, surah_num, caption)
-success = True
+        success = await send_audio(context, query.message.chat_id, audio_url, caption)
         if success:
             me = await context.bot.get_me()
             share_text = f"استمع لسورة {surah_name} بصوت {reader_name} 🎧"
