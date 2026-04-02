@@ -52,31 +52,66 @@ SURAHS = [
 "الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"
 ]
 
+# ------------------- المستخدمون -------------------
+def load_users():
+    try:
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_user(user_id, username, full_name):
+    users = load_users()
+    if str(user_id) not in users:
+        users[str(user_id)] = {"username": username, "name": full_name, "favorite_reader": None}
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+
+def get_favorite_reader(user_id):
+    return load_users().get(str(user_id), {}).get("favorite_reader")
+
+def save_favorite_reader(user_id, reader_index):
+    users = load_users()
+    if str(user_id) in users:
+        users[str(user_id)]["favorite_reader"] = reader_index
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+
+# ------------------- إرسال الصوت مع retries -------------------
+async def send_audio(context, chat_id, audio_url, caption, surah_name, retries=3):
+    file_name = f"{surah_name}.mp3"
+    attempt = 0
+    while attempt < retries:
+        try:
+            with requests.get(audio_url, stream=True, timeout=60) as r:
+                if r.status_code != 200:
+                    attempt += 1
+                    continue
+                with open(file_name, "wb") as f:
+                    for chunk in r.iter_content(1024*1024):
+                        if chunk:
+                            f.write(chunk)
+            with open(file_name, "rb") as audio:
+                await context.bot.send_audio(chat_id=chat_id, audio=audio, caption=caption)
+            return True
+        except Exception as e:
+            print(f"Attempt {attempt+1} failed for {surah_name}: {e}")
+            attempt += 1
+        finally:
+            if os.path.exists(file_name):
+                os.remove(file_name)
+    print(f"Failed to send {surah_name} after {retries} attempts")
+    return False
+
+# ------------------- واجهة المستخدم -------------------
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
-    [[KeyboardButton("/start"), KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية"),
-      KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")]],
+    [
+        [KeyboardButton("/start")],
+        [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")],
+        [KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")]
+    ],
     resize_keyboard=True
 )
-
-async def send_audio(context, chat_id, audio_url, caption, surah_name):
-    file_name = f"{surah_name}.mp3"
-    try:
-        with requests.get(audio_url, stream=True, timeout=60) as r:
-            if r.status_code != 200:
-                return False
-            with open(file_name, "wb") as f:
-                for chunk in r.iter_content(1024*1024):
-                    if chunk:
-                        f.write(chunk)
-        with open(file_name, "rb") as audio:
-            await context.bot.send_audio(chat_id=chat_id, audio=audio, caption=caption)
-        return True
-    except Exception as e:
-        print("Error:", e)
-        return False
-    finally:
-        if os.path.exists(file_name):
-            os.remove(file_name)
 
 def build_surah_keyboard(page=1):
     if page == 1:
@@ -114,12 +149,14 @@ def build_readers_keyboard():
         keyboard.append(row)
     return keyboard
 
+# ------------------- start -------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     save_user(user.id, user.username, user.full_name)
     await update.message.reply_text(WELCOME_MESSAGE, reply_markup=MAIN_KEYBOARD)
     await update.message.reply_text("📖 اختر السورة:", reply_markup=InlineKeyboardMarkup(build_surah_keyboard(1)))
 
+# ------------------- callback -------------------
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -145,6 +182,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("⏳ جاري التحميل...")
         await send_audio(context, query.message.chat_id, f"{url}{surah_str}.mp3", f"{surah_name} - {reader_name}", surah_name)
 
+# ------------------- تشغيل البوت -------------------
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
