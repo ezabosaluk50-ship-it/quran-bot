@@ -52,6 +52,15 @@ SURAHS = [
 "الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"
 ]
 
+MAIN_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("/start")],
+        [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")],
+        [KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")]
+    ],
+    resize_keyboard=True
+)
+
 # ------------------- المستخدمون -------------------
 def load_users():
     try:
@@ -104,15 +113,6 @@ async def send_audio(context, chat_id, audio_url, caption, surah_name, retries=3
     return False
 
 # ------------------- واجهة المستخدم -------------------
-MAIN_KEYBOARD = ReplyKeyboardMarkup(
-    [
-        [KeyboardButton("/start")],
-        [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")],
-        [KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")]
-    ],
-    resize_keyboard=True
-)
-
 def build_surah_keyboard(page=1):
     if page == 1:
         surahs_slice = SURAHS[:57]
@@ -137,7 +137,7 @@ def build_surah_keyboard(page=1):
     keyboard.append(nav_buttons)
     return keyboard
 
-def build_readers_keyboard():
+def build_readers_keyboard(user_id=None):
     keyboard = []
     row = []
     for i, (name, _) in enumerate(READERS_LIST):
@@ -161,20 +161,29 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
+    user_id = query.from_user.id
 
+    # صفحة السور
     if data.startswith("page_"):
         page = 1 if data == "page_1" else 2
         await query.edit_message_text("📖 اختر السورة:", reply_markup=InlineKeyboardMarkup(build_surah_keyboard(page)))
+
+    # سورة عشوائية
     elif data == "random":
         num = random.randint(1, 114)
         context.user_data["surah"] = num
         await query.edit_message_text(f"🎲 سورة {SURAHS[num-1]}", reply_markup=InlineKeyboardMarkup(build_readers_keyboard()))
+
+    # اختيار سورة
     elif data.startswith("surah_"):
         num = int(data.split("_")[1])
         context.user_data["surah"] = num
         await query.edit_message_text(f"📖 سورة {SURAHS[num-1]}", reply_markup=InlineKeyboardMarkup(build_readers_keyboard()))
+
+    # اختيار قارئ
     elif data.startswith("reader_"):
         reader_index = int(data.split("_")[1])
+        save_favorite_reader(user_id, reader_index)  # حفظ القارئ المفضل
         reader_name, url = READERS_LIST[reader_index]
         surah = context.user_data.get("surah", 1)
         surah_name = SURAHS[surah-1]
