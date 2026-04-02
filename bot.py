@@ -15,9 +15,11 @@ if not TOKEN:
 USERS_FILE = "users.json"
 
 WELCOME_MESSAGE = """🌙 أهلاً بك في بوت القرآن الكريم 🌙
-🤍 استمع للقرآن الكريم بصوت نخبة من القرّاء
-📖 اختر السورة واستمتع بالتلاوة
-✨ لا تنسَ مشاركة البوت 🤲"""
+🤍 استمع للقرآن الكريم بصوت نخبة من القرّاء في أي وقت
+📖 اختر القارئ واستمتع بالتلاوة بخشوع
+🎧 البوت يعمل في الخلفية لتستمر بالتصفح والاستماع معًا
+📖 قال تعالى: "ألا بذكر الله تطمئن القلوب"
+✨ شارك البوت لتكسب الأجر 🤲"""
 
 READERS_LIST = [
     ("مشاري العفاسي","https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/"),
@@ -50,32 +52,12 @@ SURAHS = [
 "الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"
 ]
 
-# ------------------- المستخدمون -------------------
-def load_users():
-    try:
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
+MAIN_KEYBOARD = ReplyKeyboardMarkup(
+    [[KeyboardButton("/start"), KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية"),
+      KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")]],
+    resize_keyboard=True
+)
 
-def save_user(user_id, username, full_name):
-    users = load_users()
-    if str(user_id) not in users:
-        users[str(user_id)] = {"username": username, "name": full_name, "favorite_reader": None}
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
-
-def get_favorite_reader(user_id):
-    return load_users().get(str(user_id), {}).get("favorite_reader")
-
-def save_favorite_reader(user_id, reader_index):
-    users = load_users()
-    if str(user_id) in users:
-        users[str(user_id)]["favorite_reader"] = reader_index
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
-
-# ------------------- إرسال الصوت -------------------
 async def send_audio(context, chat_id, audio_url, caption, surah_name):
     file_name = f"{surah_name}.mp3"
     try:
@@ -95,13 +77,6 @@ async def send_audio(context, chat_id, audio_url, caption, surah_name):
     finally:
         if os.path.exists(file_name):
             os.remove(file_name)
-
-# ------------------- واجهة المستخدم -------------------
-MAIN_KEYBOARD = ReplyKeyboardMarkup(
-    [[KeyboardButton("/start"), KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية"),
-      KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")]],
-    resize_keyboard=True
-)
 
 def build_surah_keyboard(page=1):
     if page == 1:
@@ -139,7 +114,6 @@ def build_readers_keyboard():
         keyboard.append(row)
     return keyboard
 
-# ------------------- أوامر -------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     save_user(user.id, user.username, user.full_name)
@@ -151,32 +125,26 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
-    # التنقل بين الصفحات
     if data.startswith("page_"):
         page = 1 if data == "page_1" else 2
         await query.edit_message_text("📖 اختر السورة:", reply_markup=InlineKeyboardMarkup(build_surah_keyboard(page)))
-
     elif data == "random":
         num = random.randint(1, 114)
         context.user_data["surah"] = num
         await query.edit_message_text(f"🎲 سورة {SURAHS[num-1]}", reply_markup=InlineKeyboardMarkup(build_readers_keyboard()))
-
     elif data.startswith("surah_"):
         num = int(data.split("_")[1])
         context.user_data["surah"] = num
         await query.edit_message_text(f"📖 سورة {SURAHS[num-1]}", reply_markup=InlineKeyboardMarkup(build_readers_keyboard()))
-
     elif data.startswith("reader_"):
         reader_index = int(data.split("_")[1])
         reader_name, url = READERS_LIST[reader_index]
         surah = context.user_data.get("surah", 1)
         surah_name = SURAHS[surah-1]
         surah_str = str(surah).zfill(3)
-
         await query.edit_message_text("⏳ جاري التحميل...")
         await send_audio(context, query.message.chat_id, f"{url}{surah_str}.mp3", f"{surah_name} - {reader_name}", surah_name)
 
-# ------------------- تشغيل البوت -------------------
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
