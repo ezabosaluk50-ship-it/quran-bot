@@ -3,7 +3,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # 🔑 ضع توكن البوت هنا
-TOKEN = "PUT_YOUR_BOT_TOKEN_HERE"
+TOKEN = "8285683997:AAEGtW87OC8XB0x7g75mhMM2iajYHc-p3uc"
 
 
 # ✅ دالة تجيب رابط شغال تلقائيًا
