@@ -3,7 +3,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# إعداد السجلات لمراقبة الأخطاء في Railway
+# إعداد السجلات
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -16,7 +16,7 @@ WELCOME_MESSAGE = """🌙 أهلاً بك في بوت القرآن الكريم 
 📖 قال تعالى: "ألا بذكر الله تطمئن القلوب"
 ✨ شارك البوت لتكسب الأجر 🤲"""
 
-# --- قائمة القراء المحدثة والمستقرة (Direct Link) ---
+# --- قائمة القراء مع روابط محدثة (تم تحديث إسلام صبحي) ---
 READERS_LIST = [
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
     ("ماهر المعيقلي", "https://server12.mp3quran.net/maher/"),
@@ -34,7 +34,7 @@ READERS_LIST = [
     ("أبو بكر الشاطري", "https://server11.mp3quran.net/shatri/"),
     ("خالد الجليل", "https://server10.mp3quran.net/jleel/"),
     ("محمود الحصري", "https://server13.mp3quran.net/husr/"),
-    ("إسلام صبحي", "https://server14.mp3quran.net/islam/"),
+    ("إسلام صبحي", "https://server14.mp3quran.net/islam/"), # الرابط الأكثر استقراراً
 ]
 
 SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
@@ -52,8 +52,7 @@ def build_surah_keyboard(page=1):
         index = i+1 if page==1 else i+58
         row.append(InlineKeyboardButton(name, callback_data=f"surah_{index}"))
         if len(row) == 4:
-            keyboard.append(row)
-            row = []
+            keyboard.append(row); row = []
     if row: keyboard.append(row)
     nav = [InlineKeyboardButton("التالي ◀️", callback_data="page_2")] if page==1 else [InlineKeyboardButton("▶️ السابق", callback_data="page_1")]
     keyboard.append(nav)
@@ -65,8 +64,7 @@ def build_readers_keyboard():
     for i, (name, _) in enumerate(READERS_LIST):
         row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
         if len(row) == 3: # 3 قراء في السطر
-            keyboard.append(row)
-            row = []
+            keyboard.append(row); row = []
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
@@ -100,30 +98,26 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         audio_url = f"{base_url}{str(surah_num).zfill(3)}.mp3"
         
         try:
-            # إرسال الملف باستخدام الرابط المباشر (أسرع وأخف)
+            # تم إضافة title و performer لضمان ظهور الاسم بالعربي دائماً
             await context.bot.send_audio(
                 chat_id=query.message.chat_id,
                 audio=audio_url,
+                title=f"سورة {surah_name}",
+                performer=reader_name,
                 caption=f"سورة {surah_name} - القارئ {reader_name}",
                 filename=f"سورة {surah_name}.mp3"
             )
             
-            # حذف الرسائل بعد الإرسال
             await status_msg.delete()
             if 'welcome_msg_id' in context.user_data:
                 try: await context.bot.delete_message(chat_id=query.message.chat_id, message_id=context.user_data['welcome_msg_id'])
                 except: pass
                 
         except Exception as e:
-            logging.error(f"خطأ في الإرسال: {e}")
-            await context.bot.send_message(chat_id=query.message.chat_id, text="❌ عذراً، هذا الملف غير متوفر حالياً لهذا القارئ.")
+            await context.bot.send_message(chat_id=query.message.chat_id, text=f"❌ عذراً، سورة {surah_name} غير متوفرة حالياً بصوت {reader_name}.")
 
 if __name__ == "__main__":
-    if not TOKEN:
-        print("❌ BOT_TOKEN missing")
-    else:
-        app = ApplicationBuilder().token(TOKEN).build()
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CallbackQueryHandler(handle_callback))
-        print("✅ البوت يعمل الآن بنظام الرفع المطور...")
-        app.run_polling()
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+    app.run_polling()
