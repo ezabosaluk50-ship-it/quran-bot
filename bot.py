@@ -6,13 +6,17 @@ import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# إعداد السجلات
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# --- القوائم الأساسية ---
-SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
+# --- رسالة الترحيب القديمة (تمت إعادتها بدقة) ---
+WELCOME_MESSAGE = """🌙 أهلاً بك في بوت القرآن الكريم 🌙
+🤍 استمع للقرآن الكريم بصوت نخبة من القرّاء في أي وقت
+📖 اختر القارئ واستمتع بالتلاوة بخشوع
+🎧 البوت يعمل في الخلفية لتستمر بالتصفح والاستماع معًا
+📖 قال تعالى: "ألا بذكر الله تطمئن القلوب"
+✨ شارك البوت لتكسب الأجر 🤲"""
 
 READERS_LIST = [
     ("مشاري العفاسي","https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/"),
@@ -34,24 +38,28 @@ READERS_LIST = [
     ("إسلام صبحي","https://server8.mp3quran.net/islam/"),
 ]
 
+SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
+
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
-    [[KeyboardButton("/start")], [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")]],
+    [
+        [KeyboardButton("/start")],
+        [KeyboardButton("📖 اختر سورة"), KeyboardButton("🎲 سورة عشوائية")],
+        [KeyboardButton("🔍 بحث عن سورة"), KeyboardButton("⭐ قارئي المفضل")]
+    ],
     resize_keyboard=True
 )
 
-# --- بناء لوحات المفاتيح ---
 def build_surah_keyboard(page=1):
     surahs_slice = SURAHS[:57] if page == 1 else SURAHS[57:]
     keyboard = []
     row = []
     for i, name in enumerate(surahs_slice):
         index = i+1 if page==1 else i+58
-        row.append(InlineKeyboardButton(f"{index}. {name}", callback_data=f"surah_{index}"))
-        if len(row) == 3:
+        row.append(InlineKeyboardButton(name, callback_data=f"surah_{index}"))
+        if len(row) == 4:
             keyboard.append(row)
             row = []
-    if row:
-        keyboard.append(row)
+    if row: keyboard.append(row)
     nav = [InlineKeyboardButton("التالي ◀️", callback_data="page_2")] if page==1 else [InlineKeyboardButton("▶️ السابق", callback_data="page_1")]
     keyboard.append(nav)
     return InlineKeyboardMarkup(keyboard)
@@ -61,16 +69,16 @@ def build_readers_keyboard():
     row = []
     for i, (name, _) in enumerate(READERS_LIST):
         row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
-        if len(row) == 2:
+        if len(row) == 3: # تم التعديل ليكون 3 قراء في كل سطر
             keyboard.append(row)
             row = []
-    if row:
-        keyboard.append(row)
+    if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
-# --- الدوال الأساسية ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✨ مرحباً بك في بوت القرآن الكريم", reply_markup=MAIN_KEYBOARD)
+    # حفظ معرف رسالة الترحيب لحذفها لاحقاً
+    msg = await update.message.reply_text(WELCOME_MESSAGE, reply_markup=MAIN_KEYBOARD)
+    context.user_data['welcome_msg_id'] = msg.message_id
     await update.message.reply_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(1))
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -81,19 +89,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("page_"):
         page = int(data.split("_")[1])
         await query.edit_message_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(page))
-
     elif data.startswith("surah_"):
         num = int(data.split("_")[1])
         context.user_data["surah"] = num
         await query.edit_message_text(f"🎙 اختر القارئ لسورة {SURAHS[num-1]}:", reply_markup=build_readers_keyboard())
-
     elif data.startswith("reader_"):
         reader_idx = int(data.split("_")[1])
         surah_num = context.user_data.get("surah", 1)
         reader_name, base_url = READERS_LIST[reader_idx]
         surah_name = SURAHS[surah_num-1]
         
-        await query.edit_message_text(f"⏳ جاري تحضير سورة {surah_name} بصوت {reader_name}...")
+        status_msg = await query.edit_message_text(f"⏳ جاري تحميل {surah_name} بصوت {reader_name}...")
         
         audio_url = f"{base_url}{str(surah_num).zfill(3)}.mp3"
         file_path = f"{surah_num}.mp3"
@@ -104,20 +110,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if chunk: f.write(chunk)
             with open(file_path, "rb") as audio:
                 await context.bot.send_audio(chat_id=query.message.chat_id, audio=audio, caption=f"{surah_name} - {reader_name}")
-        except Exception as e:
-            await context.bot.send_message(chat_id=query.message.chat_id, text="❌ حدث خطأ في التحميل.")
+            
+            # حذف رسالة الترحيب ورسالة الحالة بعد إرسال السورة بنجاح
+            await status_msg.delete()
+            if 'welcome_msg_id' in context.user_data:
+                try:
+                    await context.bot.delete_message(chat_id=query.message.chat_id, message_id=context.user_data['welcome_msg_id'])
+                except: pass
+                
+        except Exception:
+            await context.bot.send_message(chat_id=query.message.chat_id, text="❌ حدث خطأ أثناء التحميل.")
         finally:
-            if os.path.exists(file_path): 
-                os.remove(file_path)
+            if os.path.exists(file_path): os.remove(file_path)
 
-# --- تشغيل البوت ---
 if __name__ == "__main__":
-    if not TOKEN:
-        print("❌ BOT_TOKEN missing")
-    else:
-        app = ApplicationBuilder().token(TOKEN).build()
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CallbackQueryHandler(handle_callback))
-        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), start))
-        print("✅ البوت يعمل الآن...")
-        app.run_polling()
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+    app.run_polling()
