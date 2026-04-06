@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# --- رسالة الترحيب القديمة (تمت إعادتها بدقة) ---
+# --- رسالة الترحيب القديمة ---
 WELCOME_MESSAGE = """🌙 أهلاً بك في بوت القرآن الكريم 🌙
 🤍 استمع للقرآن الكريم بصوت نخبة من القرّاء في أي وقت
 📖 اختر القارئ واستمتع بالتلاوة بخشوع
@@ -69,14 +69,13 @@ def build_readers_keyboard():
     row = []
     for i, (name, _) in enumerate(READERS_LIST):
         row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
-        if len(row) == 3: # تم التعديل ليكون 3 قراء في كل سطر
+        if len(row) == 3: # 3 قراء في كل سطر كما طلبت
             keyboard.append(row)
             row = []
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # حفظ معرف رسالة الترحيب لحذفها لاحقاً
     msg = await update.message.reply_text(WELCOME_MESSAGE, reply_markup=MAIN_KEYBOARD)
     context.user_data['welcome_msg_id'] = msg.message_id
     await update.message.reply_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(1))
@@ -99,19 +98,28 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reader_name, base_url = READERS_LIST[reader_idx]
         surah_name = SURAHS[surah_num-1]
         
-        status_msg = await query.edit_message_text(f"⏳ جاري تحميل {surah_name} بصوت {reader_name}...")
+        status_msg = await query.edit_message_text(f"⏳ جاري تحميل سورة {surah_name} بصوت {reader_name}...")
         
         audio_url = f"{base_url}{str(surah_num).zfill(3)}.mp3"
-        file_path = f"{surah_num}.mp3"
+        # تم تعديل اسم الملف ليظهر بالعربي عند الإرسال
+        file_path = f"سورة {surah_name}.mp3" 
+        
         try:
             r = requests.get(audio_url, stream=True)
             with open(file_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=1024*1024):
                     if chunk: f.write(chunk)
-            with open(file_path, "rb") as audio:
-                await context.bot.send_audio(chat_id=query.message.chat_id, audio=audio, caption=f"{surah_name} - {reader_name}")
             
-            # حذف رسالة الترحيب ورسالة الحالة بعد إرسال السورة بنجاح
+            with open(file_path, "rb") as audio:
+                # إرسال الملف بالاسم العربي المسجل في file_path
+                await context.bot.send_audio(
+                    chat_id=query.message.chat_id, 
+                    audio=audio, 
+                    caption=f"سورة {surah_name} - القارئ {reader_name}",
+                    filename=f"سورة {surah_name}.mp3"
+                )
+            
+            # حذف الرسائل بعد الإرسال بنجاح
             await status_msg.delete()
             if 'welcome_msg_id' in context.user_data:
                 try:
@@ -119,9 +127,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except: pass
                 
         except Exception:
-            await context.bot.send_message(chat_id=query.message.chat_id, text="❌ حدث خطأ أثناء التحميل.")
+            await context.bot.send_message(chat_id=query.message.chat_id, text="❌ عذراً، حدث خطأ أثناء تحميل السورة.")
         finally:
-            if os.path.exists(file_path): os.remove(file_path)
+            if os.path.exists(file_path): 
+                os.remove(file_path)
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
