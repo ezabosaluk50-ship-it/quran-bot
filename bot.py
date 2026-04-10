@@ -5,16 +5,17 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# إعداد السجلات لمراقبة الأداء
+# إعداد السجلات
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
-# الـ ID الخاص بك لرؤية الإحصائيات (مخفي عن البقية)
+
+# ⚠️ تأكد أن هذا هو رقم الـ ID الخاص بك (من بوت @userinfobot)
 ADMIN_ID = 5410915902 
 
 USER_FILE = "users.json"
 
-# --- وظائف الإحصائيات وحفظ المستخدمين ---
+# --- وظائف الإحصائيات ---
 def save_user(user_id):
     users = []
     if os.path.exists(USER_FILE):
@@ -32,7 +33,7 @@ def get_stats():
         try: return len(json.load(f))
         except: return 0
 
-# --- بيانات القراء والسور ---
+# --- البيانات ---
 READERS_LIST = [
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
     ("ماهر المعيقلي", "https://server12.mp3quran.net/maher/"),
@@ -46,28 +47,22 @@ READERS_LIST = [
     ("فارس عباد", "https://server8.mp3quran.net/frs_a/"),
     ("عبدالرحمن السديس", "https://server11.mp3quran.net/sds/"),
     ("محمد المنشاوي", "https://server10.mp3quran.net/minsh/"),
-    ("هاني الرفاعي", "https://server8.mp3quran.net/hani/"),
     ("خالد الجليل", "https://server10.mp3quran.net/jleel/"),
-    ("محمود الحصري", "https://server13.mp3quran.net/husr/"),
 ]
 
 SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
 
-ISLAM_SOBHI_AVAILABLE = {1, 2, 3, 12, 13, 14, 15, 18, 19, 20, 21, 24, 25, 26, 27, 30, 31, 32, 36, 41, 42, 43, 44, 47, 48, 50, 51, 52, 53, 54, 55, 56, 62, 67, 68, 70, 71, 72, 73, 74, 75, 77, 78, 79, 80, 81, 82, 85, 87, 88, 89, 90, 91, 93, 94, 95, 96, 97, 100, 101, 102, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114}
-
-# --- لوحة المفاتيح الرئيسية ---
+# --- لوحات المفاتيح ---
 def get_main_keyboard(user_id):
     buttons = [
         [KeyboardButton("ابدأ 🤍"), KeyboardButton("📖 اختر سورة")],
         [KeyboardButton("🎲 سورة عشوائية"), KeyboardButton("🔍 بحث")],
         [KeyboardButton("⭐ القارئ المفضل")]
     ]
-    # زر الإحصائيات يظهر لك وحدك
     if user_id == ADMIN_ID:
         buttons.append([KeyboardButton("📊 الإحصائيات")])
     return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
 
-# --- بناء كيبورد السور والقراء ---
 def build_surah_keyboard(page=1):
     surahs_slice = SURAHS[:57] if page == 1 else SURAHS[57:]
     keyboard = []
@@ -92,11 +87,21 @@ def build_readers_keyboard():
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
+# --- معالجة الأوامر ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     save_user(user_id)
     await update.message.reply_text("🌙 أهلاً بك في بوت القرآن الكريم 🌙", reply_markup=get_main_keyboard(user_id))
     await update.message.reply_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(1))
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id == ADMIN_ID:
+        count = get_stats()
+        await update.message.reply_text(f"📊 إحصائيات البوت:\nعدد المستخدمين: {count}")
+    else:
+        # إذا حاول شخص آخر كتابة /stats لن يرى شيئاً
+        pass
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -115,17 +120,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reader_name, base_url = READERS_LIST[reader_idx]
         surah_name = SURAHS[surah_num-1]
         context.user_data["fav_reader_name"] = reader_name
-        if reader_name == "إسلام صبحي" and surah_num not in ISLAM_SOBHI_AVAILABLE:
-            await query.edit_message_text(f"⚠️ سورة {surah_name} غير متوفرة بصوت إسلام صبحي حالياً.")
-            return
         status_msg = await query.edit_message_text(f"⏳ جاري إرسال سورة {surah_name}...")
         audio_url = f"{base_url}{str(surah_num).zfill(3)}.mp3"
         try:
             await context.bot.send_audio(
                 chat_id=query.message.chat_id, audio=audio_url,
                 title=f"سورة {surah_name}", performer=reader_name,
-                caption=f"سورة {surah_name} - القارئ {reader_name}",
-                filename=f"{surah_name}.mp3"
+                caption=f"سورة {surah_name} - القارئ {reader_name}"
             )
             await status_msg.delete()
         except:
@@ -134,9 +135,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.effective_user.id
-    
-    # التحقق من النص الجديد بالقلب الأبيض
-    if text in ["ابدأ 🤍", "/start"]:
+
+    # تحسين التعرف على "ابدأ"
+    if text.startswith("ابدأ") or text == "/start":
         await start(update, context)
     elif text == "📖 اختر سورة":
         await update.message.reply_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(1))
@@ -148,8 +149,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("أرسل اسم السورة للبحث عنها:")
         context.user_data["state"] = "searching"
     elif text == "📊 الإحصائيات" and user_id == ADMIN_ID:
-        count = get_stats()
-        await update.message.reply_text(f"📊 إحصائياتك الخاصة كمسؤول:\nعدد المستخدمين الإجمالي: {count}")
+        await stats_command(update, context)
     elif text == "⭐ القارئ المفضل":
         fav = context.user_data.get("fav_reader_name", "لم تختر قارئاً بعد")
         await update.message.reply_text(f"⭐ قارئك المفضل حالياً: {fav}")
@@ -166,6 +166,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("stats", stats_command)) # إضافة الأمر صراحة
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.run_polling()
