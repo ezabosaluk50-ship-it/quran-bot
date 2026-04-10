@@ -5,22 +5,21 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# إعداد السجلات
+# إعداد السجلات لمراقبة الأداء
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
-# ⚠️ ضع الـ ID الخاص بك هنا لكي يظهر لك زر الإحصائيات وحدك
+# الـ ID الخاص بك لرؤية الإحصائيات (مخفي عن البقية)
 ADMIN_ID = 5410915902 
 
 USER_FILE = "users.json"
 
-# --- وظائف الإحصائيات ---
+# --- وظائف الإحصائيات وحفظ المستخدمين ---
 def save_user(user_id):
     users = []
     if os.path.exists(USER_FILE):
         with open(USER_FILE, "r") as f:
-            try:
-                users = json.load(f)
+            try: users = json.load(f)
             except: users = []
     if user_id not in users:
         users.append(user_id)
@@ -33,7 +32,7 @@ def get_stats():
         try: return len(json.load(f))
         except: return 0
 
-# --- البيانات الأساسية ---
+# --- بيانات القراء والسور ---
 READERS_LIST = [
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
     ("ماهر المعيقلي", "https://server12.mp3quran.net/maher/"),
@@ -56,18 +55,19 @@ SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","ال
 
 ISLAM_SOBHI_AVAILABLE = {1, 2, 3, 12, 13, 14, 15, 18, 19, 20, 21, 24, 25, 26, 27, 30, 31, 32, 36, 41, 42, 43, 44, 47, 48, 50, 51, 52, 53, 54, 55, 56, 62, 67, 68, 70, 71, 72, 73, 74, 75, 77, 78, 79, 80, 81, 82, 85, 87, 88, 89, 90, 91, 93, 94, 95, 96, 97, 100, 101, 102, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114}
 
-# --- وظيفة بناء الكيبورد الرئيسي الذكي ---
+# --- لوحة المفاتيح الرئيسية ---
 def get_main_keyboard(user_id):
     buttons = [
-        [KeyboardButton("ابدأ 🔄"), KeyboardButton("📖 اختر سورة")],
+        [KeyboardButton("ابدأ 🤍"), KeyboardButton("📖 اختر سورة")],
         [KeyboardButton("🎲 سورة عشوائية"), KeyboardButton("🔍 بحث")],
         [KeyboardButton("⭐ القارئ المفضل")]
     ]
-    # إضافة زر الإحصائيات فقط إذا كان المستخدم هو المشرف
+    # زر الإحصائيات يظهر لك وحدك
     if user_id == ADMIN_ID:
         buttons.append([KeyboardButton("📊 الإحصائيات")])
     return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
 
+# --- بناء كيبورد السور والقراء ---
 def build_surah_keyboard(page=1):
     surahs_slice = SURAHS[:57] if page == 1 else SURAHS[57:]
     keyboard = []
@@ -76,8 +76,7 @@ def build_surah_keyboard(page=1):
         index = i+1 if page==1 else i+58
         row.append(InlineKeyboardButton(f"{index}. {name}", callback_data=f"surah_{index}"))
         if len(row) == 4:
-            keyboard.append(row)
-            row = []
+            keyboard.append(row); row = []
     if row: keyboard.append(row)
     nav = [InlineKeyboardButton("التالي ◀️", callback_data="page_2")] if page==1 else [InlineKeyboardButton("▶️ السابق", callback_data="page_1")]
     keyboard.append(nav)
@@ -89,18 +88,14 @@ def build_readers_keyboard():
     for i, (name, _) in enumerate(READERS_LIST):
         row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
         if len(row) == 3:
-            keyboard.append(row)
-            row = []
+            keyboard.append(row); row = []
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     save_user(user_id)
-    await update.message.reply_text(
-        "🌙 أهلاً بك في بوت القرآن الكريم 🌙", 
-        reply_markup=get_main_keyboard(user_id)
-    )
+    await update.message.reply_text("🌙 أهلاً بك في بوت القرآن الكريم 🌙", reply_markup=get_main_keyboard(user_id))
     await update.message.reply_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(1))
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -121,7 +116,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         surah_name = SURAHS[surah_num-1]
         context.user_data["fav_reader_name"] = reader_name
         if reader_name == "إسلام صبحي" and surah_num not in ISLAM_SOBHI_AVAILABLE:
-            await query.edit_message_text(f"⚠️ سورة {surah_name} غير متوفرة بصوت إسلام صبحي.")
+            await query.edit_message_text(f"⚠️ سورة {surah_name} غير متوفرة بصوت إسلام صبحي حالياً.")
             return
         status_msg = await query.edit_message_text(f"⏳ جاري إرسال سورة {surah_name}...")
         audio_url = f"{base_url}{str(surah_num).zfill(3)}.mp3"
@@ -139,7 +134,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.effective_user.id
-    if text in ["ابدأ 🔄", "/start"]:
+    
+    # التحقق من النص الجديد بالقلب الأبيض
+    if text in ["ابدأ 🤍", "/start"]:
         await start(update, context)
     elif text == "📖 اختر سورة":
         await update.message.reply_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(1))
@@ -167,11 +164,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = None
 
 if __name__ == "__main__":
-    if not TOKEN:
-        print("Error: BOT_TOKEN not found")
-    else:
-        app = ApplicationBuilder().token(TOKEN).build()
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CallbackQueryHandler(handle_callback))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        app.run_polling()
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.run_polling()
