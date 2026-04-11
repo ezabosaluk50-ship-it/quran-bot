@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# قائمة القراء (14 قارئاً)
+# القائمة الكاملة (14 قارئاً)
 READERS_LIST = [
     ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
@@ -32,20 +32,19 @@ SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","ال
 
 # --- لوحة المفاتيح ---
 def get_main_keyboard():
-    # الزر بالقلب الأزرق 💙
     return ReplyKeyboardMarkup([
         [KeyboardButton("ابدأ 💙"), KeyboardButton("📖 اختر سورة")],
         [KeyboardButton("🎲 سورة عشوائية"), KeyboardButton("🔍 بحث")]
     ], resize_keyboard=True)
 
+# --- دالة البداية (تمنع التكرار) ---
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """الاستجابة لـ /start أو زر ابدأ"""
+    # نرد فقط إذا كانت الرسالة نصية من المستخدم مباشرة لمنع التكرار
     await update.message.reply_text(
-        "✨ تم تفعيل البوت بنجاح ✨\nاختر ما تريد من الأزرار أدناه:",
+        "✨ تم تفعيل البوت بنجاح ✨\nاختر السورة والقارئ للاستماع:",
         reply_markup=get_main_keyboard()
     )
 
-# --- منطق السور والقراء (المستقر) ---
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -62,7 +61,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r_name, r_url = READERS_LIST[idx]
         msg = await query.edit_message_text(f"⏳ جاري تجهيز سورة {SURAHS[s_num-1]} بصوت {r_name}...")
         
-        # محاولة السيرفرات لضمان العجمي
         servers = [r_url, r_url.replace("server10", "server11"), r_url.replace("server10", "server6")]
         success = False
         for base_url in servers:
@@ -99,21 +97,20 @@ def build_readers_keyboard():
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
-# --- معالجة الرسائل النصية ---
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if not text: return
 
-    # الحل الجذري: التعامل مع "ابدأ" أياً كان الإيموجي أو الزيادات
-    if "ابدأ" in text:
+    # تم إصلاح الشرط هنا لمنع التكرار (استجابة دقيقة للزر)
+    if text == "ابدأ 💙":
         await start_logic(update, context)
-    elif "اختر سورة" in text:
+    elif text == "📖 اختر سورة":
         await update.message.reply_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(1))
-    elif "سورة عشوائية" in text:
+    elif text == "🎲 سورة عشوائية":
         num = random.randint(1, 114)
         context.user_data["s_num"] = num
         await update.message.reply_text(f"🎲 سورة {SURAHS[num-1]}، اختر القارئ:", reply_markup=build_readers_keyboard())
-    elif "بحث" in text:
+    elif text == "🔍 بحث":
         await update.message.reply_text("أرسل اسم السورة:")
         context.user_data["searching"] = True
     elif context.user_data.get("searching"):
@@ -126,6 +123,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
+    # أوامر الصيانة الأساسية
     app.add_handler(CommandHandler("start", start_logic))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
