@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# القائمة الكاملة (14 قارئاً)
+# القائمة الكاملة للقراء (14 قارئاً)
 READERS_LIST = [
     ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
@@ -30,18 +30,16 @@ READERS_LIST = [
 
 SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
 
-# --- لوحة المفاتيح ---
 def get_main_keyboard():
     return ReplyKeyboardMarkup([
         [KeyboardButton("ابدأ 💙"), KeyboardButton("📖 اختر سورة")],
         [KeyboardButton("🎲 سورة عشوائية"), KeyboardButton("🔍 بحث")]
     ], resize_keyboard=True)
 
-# --- دالة البداية (تمنع التكرار) ---
+# --- تم إصلاح هذه الدالة لتظهر الأزرار فوراً ---
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # نرد فقط إذا كانت الرسالة نصية من المستخدم مباشرة لمنع التكرار
     await update.message.reply_text(
-        "✨ تم تفعيل البوت بنجاح ✨\nاختر السورة والقارئ للاستماع:",
+        "✨ تم تفعيل البوت بنجاح ✨\nاستخدم الأزرار أدناه للاستماع:",
         reply_markup=get_main_keyboard()
     )
 
@@ -54,6 +52,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(int(data.split("_")[1])))
     elif data.startswith("surah_"):
         context.user_data["s_num"] = int(data.split("_")[1])
+        # هنا تظهر قائمة القراء
         await query.edit_message_text(f"🎙 اختر القارئ لسورة {SURAHS[context.user_data['s_num']-1]}:", reply_markup=build_readers_keyboard())
     elif data.startswith("reader_"):
         idx = int(data.split("_")[1])
@@ -101,29 +100,28 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if not text: return
 
-    # تم إصلاح الشرط هنا لمنع التكرار (استجابة دقيقة للزر)
     if text == "ابدأ 💙":
         await start_logic(update, context)
     elif text == "📖 اختر سورة":
-        await update.message.reply_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(1))
+        # عند الضغط على "اختر سورة" تظهر قائمة السور فوراً
+        await update.message.reply_text("📖 اختر السورة التي تريد الاستماع إليها:", reply_markup=build_surah_keyboard(1))
     elif text == "🎲 سورة عشوائية":
         num = random.randint(1, 114)
         context.user_data["s_num"] = num
         await update.message.reply_text(f"🎲 سورة {SURAHS[num-1]}، اختر القارئ:", reply_markup=build_readers_keyboard())
     elif text == "🔍 بحث":
-        await update.message.reply_text("أرسل اسم السورة:")
+        await update.message.reply_text("أرسل اسم السورة للبحث عنها:")
         context.user_data["searching"] = True
     elif context.user_data.get("searching"):
         for i, name in enumerate(SURAHS):
             if text in name:
                 context.user_data["s_num"] = i + 1
-                await update.message.reply_text(f"✅ سورة {name}، اختر القارئ:", reply_markup=build_readers_keyboard())
+                await update.message.reply_text(f"✅ وجدنا سورة {name}، اختر القارئ:", reply_markup=build_readers_keyboard())
                 context.user_data["searching"] = False
                 return
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
-    # أوامر الصيانة الأساسية
     app.add_handler(CommandHandler("start", start_logic))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
