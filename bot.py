@@ -6,12 +6,11 @@ from io import BytesIO
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# إعداد السجلات
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# القائمة الكاملة (14 قارئاً) - لم يتم تغيير أي شيء هنا لضمان عمل العجمي
+# قائمة القراء (14 قارئاً)
 READERS_LIST = [
     ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
@@ -31,46 +30,22 @@ READERS_LIST = [
 
 SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
 
-# --- لوحات المفاتيح ---
+# --- لوحة المفاتيح ---
 def get_main_keyboard():
-    # تم تغيير القلب للأزرق 💙
-    buttons = [
+    # الزر بالقلب الأزرق 💙
+    return ReplyKeyboardMarkup([
         [KeyboardButton("ابدأ 💙"), KeyboardButton("📖 اختر سورة")],
         [KeyboardButton("🎲 سورة عشوائية"), KeyboardButton("🔍 بحث")]
-    ]
-    return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
+    ], resize_keyboard=True)
 
-def build_surah_keyboard(page=1):
-    start, end = (0, 57) if page == 1 else (57, 114)
-    keyboard = []
-    row = []
-    for i in range(start, end):
-        row.append(InlineKeyboardButton(f"{i+1}. {SURAHS[i]}", callback_data=f"surah_{i+1}"))
-        if len(row) == 3:
-            keyboard.append(row); row = []
-    if row: keyboard.append(row)
-    nav = [InlineKeyboardButton("التالي ◀️", callback_data="page_2")] if page == 1 else [InlineKeyboardButton("▶️ السابق", callback_data="page_1")]
-    keyboard.append(nav)
-    return InlineKeyboardMarkup(keyboard)
-
-def build_readers_keyboard():
-    keyboard = []
-    row = []
-    for i, (name, _) in enumerate(READERS_LIST):
-        row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
-        if len(row) == 2:
-            keyboard.append(row); row = []
-    if row: keyboard.append(row)
-    return InlineKeyboardMarkup(keyboard)
-
-# --- الدوال التنفيذية ---
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دالة موحدة للاستجابة لأمر البداية"""
+    """الاستجابة لـ /start أو زر ابدأ"""
     await update.message.reply_text(
-        "✨ مرحباً بك في بوت القرآن الكريم ✨\nاستخدم الأزرار أدناه للاستماع.",
+        "✨ تم تفعيل البوت بنجاح ✨\nاختر ما تريد من الأزرار أدناه:",
         reply_markup=get_main_keyboard()
     )
 
+# --- منطق السور والقراء (المستقر) ---
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -85,68 +60,73 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         idx = int(data.split("_")[1])
         s_num = context.user_data.get("s_num", 1)
         r_name, r_url = READERS_LIST[idx]
-        
         msg = await query.edit_message_text(f"⏳ جاري تجهيز سورة {SURAHS[s_num-1]} بصوت {r_name}...")
         
-        # منطق السيرفرات المتعددة (الذي أصلح مشكلة العجمي)
+        # محاولة السيرفرات لضمان العجمي
         servers = [r_url, r_url.replace("server10", "server11"), r_url.replace("server10", "server6")]
         success = False
-        
         for base_url in servers:
             file_url = f"{base_url}{str(s_num).zfill(3)}.mp3"
             try:
-                response = requests.get(file_url, timeout=15)
-                if response.status_code == 200:
-                    audio_content = BytesIO(response.content)
+                resp = requests.get(file_url, timeout=15)
+                if resp.status_code == 200:
+                    audio_content = BytesIO(resp.content)
                     audio_content.name = f"{SURAHS[s_num-1]}.mp3"
-                    await context.bot.send_audio(
-                        chat_id=query.message.chat_id,
-                        audio=audio_content,
-                        title=f"سورة {SURAHS[s_num-1]}",
-                        performer=r_name
-                    )
+                    await context.bot.send_audio(chat_id=query.message.chat_id, audio=audio_content, title=f"سورة {SURAHS[s_num-1]}", performer=r_name)
                     await msg.delete()
                     success = True
                     break
             except: continue
-        
-        if not success:
-            await msg.edit_text("❌ الملف غير متوفر حالياً على السيرفرات.")
+        if not success: await msg.edit_text("❌ الملف غير متوفر حالياً.")
 
-async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def build_surah_keyboard(page=1):
+    start, end = (0, 57) if page == 1 else (57, 114)
+    keyboard = []
+    row = []
+    for i in range(start, end):
+        row.append(InlineKeyboardButton(f"{i+1}. {SURAHS[i]}", callback_data=f"surah_{i+1}"))
+        if len(row) == 3: keyboard.append(row); row = []
+    if row: keyboard.append(row)
+    keyboard.append([InlineKeyboardButton("التالي ◀️", callback_data="page_2") if page==1 else InlineKeyboardButton("▶️ السابق", callback_data="page_1")])
+    return InlineKeyboardMarkup(keyboard)
+
+def build_readers_keyboard():
+    keyboard = []
+    row = []
+    for i, (name, _) in enumerate(READERS_LIST):
+        row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
+        if len(row) == 2: keyboard.append(row); row = []
+    if row: keyboard.append(row)
+    return InlineKeyboardMarkup(keyboard)
+
+# --- معالجة الرسائل النصية ---
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if not text: return
 
-    # البحث عن كلمة "ابدأ" بغض النظر عن الإيموجي المصاحب
+    # الحل الجذري: التعامل مع "ابدأ" أياً كان الإيموجي أو الزيادات
     if "ابدأ" in text:
         await start_logic(update, context)
-    
     elif "اختر سورة" in text:
         await update.message.reply_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(1))
-    
     elif "سورة عشوائية" in text:
         num = random.randint(1, 114)
         context.user_data["s_num"] = num
         await update.message.reply_text(f"🎲 سورة {SURAHS[num-1]}، اختر القارئ:", reply_markup=build_readers_keyboard())
-    
     elif "بحث" in text:
-        await update.message.reply_text("أرسل اسم السورة للبحث عنها:")
+        await update.message.reply_text("أرسل اسم السورة:")
         context.user_data["searching"] = True
-    
     elif context.user_data.get("searching"):
         for i, name in enumerate(SURAHS):
             if text in name:
                 context.user_data["s_num"] = i + 1
-                await update.message.reply_text(f"✅ وجدنا سورة {name}، اختر القارئ:", reply_markup=build_readers_keyboard())
+                await update.message.reply_text(f"✅ سورة {name}، اختر القارئ:", reply_markup=build_readers_keyboard())
                 context.user_data["searching"] = False
                 return
-        await update.message.reply_text("❌ لم يتم العثور على السورة.")
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start_logic))
     app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
-    
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.run_polling()
