@@ -4,93 +4,93 @@ import logging
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-# إعداد السجلات
-logging.basicConfig(level=logging.INFO)
+# 1. إعداد السجلات (ستظهر لك في Logs في Railway)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
+# 2. جلب التوكن (تأكد من ضبطه في Railway باسم BOT_TOKEN)
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# ⚠️ تأكد أن هذا هو رقمك الصحيح
+# 3. الـ ID الخاص بك (سنقوم باختباره الآن)
 ADMIN_ID = 5410915902 
 
 USER_FILE = "users.json"
 
-# --- وظائف الإحصائيات ---
+# --- وظائف قاعدة البيانات ---
 def get_stats():
     if not os.path.exists(USER_FILE): return 0
-    with open(USER_FILE, "r") as f:
-        try:
+    try:
+        with open(USER_FILE, "r") as f:
             data = json.load(f)
-            return len(data)
-        except: return 0
+            return len(data) if isinstance(data, list) else 0
+    except: return 0
 
 def save_user(user_id):
     users = []
     if os.path.exists(USER_FILE):
-        with open(USER_FILE, "r") as f:
-            try: users = json.load(f)
-            except: users = []
+        try:
+            with open(USER_FILE, "r") as f:
+                users = json.load(f)
+        except: users = []
     if user_id not in users:
         users.append(user_id)
         with open(USER_FILE, "w") as f:
             json.dump(users, f)
 
-# --- لوحة المفاتيح ---
+# --- الكيبورد ---
 def get_main_keyboard(user_id):
+    # جعلنا الزر يظهر للجميع مؤقتاً فقط لنفحص هل يعمل الضغط عليه أم لا
     buttons = [
         [KeyboardButton("ابدأ 🤍"), KeyboardButton("📖 اختر سورة")],
-        [KeyboardButton("🎲 سورة عشوائية"), KeyboardButton("🔍 بحث")]
+        [KeyboardButton("📊 الإحصائيات")]
     ]
-    # الزر يظهر لك وحدك في القائمة
-    if user_id == ADMIN_ID:
-        buttons.append([KeyboardButton("📊 الإحصائيات")])
     return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
 
-# --- الدوال البرمجية ---
+# --- الدوال التنفيذية ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     save_user(user_id)
+    logging.info(f"User {user_id} started the bot")
     await update.message.reply_text(
-        "🌙 أهلاً بك في بوت القرآن الكريم 🌙", 
+        f"أهلاً بك!\nرقم الـ ID الخاص بك هو: {user_id}", # سيخبرك برقمك فوراً
         reply_markup=get_main_keyboard(user_id)
     )
 
-async def stats_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هذه الدالة هي المسؤولة عن تشغيل /stats"""
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    logging.info(f"Stats requested by {user_id}")
     
-    # التحقق الصارم من الهوية
     if user_id == ADMIN_ID:
         count = get_stats()
-        await update.message.reply_text(f"📊 إحصائيات البوت للمشرف:\nعدد المستخدمين الحاليين: {count}")
+        await update.message.reply_text(f"📊 إحصائيات الإدارة:\nالمستخدمون: {count}")
     else:
-        # للمستخدمين العاديين: البوت لا يرد بشيء أو يرسل رسالة عادية
-        return
+        # إذا لم تكن الإداره، سيخبرك البوت بذلك بدلاً من الصمت
+        await update.message.reply_text(f"⚠️ صلاحيات محدودة.\nرقمك: {user_id}\nالمطلوب: {ADMIN_ID}")
 
-async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    user_id = update.effective_user.id
-
+    # فحص النصوص يدوياً لضمان عدم حدوث خطأ في الإيموجي
     if "ابدأ" in text:
         await start(update, context)
     elif "إحصائيات" in text:
-        # تشغيل الإحصائيات إذا ضغطت على الزر
-        await stats_logic(update, context)
+        await stats_command(update, context)
+    else:
+        await update.message.reply_text(f"وصلتني رسالتك: {text}")
 
-# --- التشغيل الرئيسي ---
 if __name__ == "__main__":
     if not TOKEN:
-        print("خطأ: لم يتم العثور على TOKEN")
+        print("CRITICAL ERROR: BOT_TOKEN is missing!")
     else:
         app = ApplicationBuilder().token(TOKEN).build()
 
-        # 1. تفعيل أمر /start
+        # ترتيب الهاندرز مهم جداً
         app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("stats", stats_command))
         
-        # 2. تفعيل أمر /stats (هذا ما طلبته تحديداً)
-        app.add_handler(CommandHandler("stats", stats_logic))
-        
-        # 3. معالجة النصوص والأزرار
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_messages))
+        # التقاط الأزرار والنصوص
+        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
 
-        print("البوت يعمل الآن...")
+        print("Bot is starting...")
         app.run_polling()
