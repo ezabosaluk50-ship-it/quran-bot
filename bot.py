@@ -9,26 +9,24 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
-# اسم الملف الذي سنخزن فيه معرفات المستخدمين لضمان عدم ضياع الإحصائيات
+# ملف حفظ المستخدمين لضمان بقاء الإحصائيات حتى بعد إعادة التشغيل
 USERS_FILE = "users_list.txt"
 
-# دالة لتحميل المستخدمين من الملف عند تشغيل البوت
 def load_users():
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, "r") as f:
             return set(line.strip() for line in f)
     return set()
 
-# دالة لحفظ مستخدم جديد في الملف
 def save_user(user_id):
-    if str(user_id) not in seen_users:
-        seen_users.add(str(user_id))
+    user_str = str(user_id)
+    if user_str not in seen_users:
+        seen_users.add(user_str)
         with open(USERS_FILE, "a") as f:
-            f.write(f"{user_id}\n")
+            f.write(f"{user_str}\n")
 
 seen_users = load_users()
 
-# --- القوائم السابقة (ثابتة كما هي) ---
 READERS_LIST = [
     ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
@@ -75,7 +73,7 @@ def build_readers_keyboard():
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
-# --- دالة البداية ---
+# --- إصلاح دالة البداية ---
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
@@ -83,16 +81,19 @@ async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         welcome_message = (
             "✨ **مرحباً بك في بوت القرآن الكريم** ✨\n\n"
             "قال رسول الله ﷺ: «اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه».\n\n"
-            "نحن هنا لنسهل لك الاستماع لكتاب الله بصوت نخبة من القراء.\n\n"
             "📖 **اختر الآن السورة التي تود الاستماع إليها:**"
         )
+        # إرسال الترحيب + الكيبورد السفلي
         await update.message.reply_text(welcome_message, reply_markup=get_main_keyboard(), parse_mode='Markdown')
-        await update.message.reply_text("قائمة السور:", reply_markup=build_surah_keyboard(1))
+        # إرسال قائمة السور
+        await update.message.reply_text("قائمة السور المتاحة:", reply_markup=build_surah_keyboard(1))
         save_user(user_id)
     else:
-        await update.message.reply_text("📖 قائمة السور:", reply_markup=build_surah_keyboard(1), reply_markup=get_main_keyboard())
+        # إذا كان مستخدماً سابقاً: نرسل رسالة واحدة تحتوي على السور والأزرار السفلية (تم إصلاح الخطأ هنا)
+        await update.message.reply_text("📖 قائمة السور:", reply_markup=get_main_keyboard())
+        await update.message.reply_text("اختر سورة:", reply_markup=build_surah_keyboard(1))
 
-# --- دالة الإحصائيات الجديدة ---
+# --- أمر الإحصائيات ---
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     count = len(seen_users)
     await update.message.reply_text(f"📊 **إحصائيات البوت:**\n\n👥 عدد المستخدمين الكلي: {count}", parse_mode='Markdown')
@@ -153,7 +154,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start_logic))
-    app.add_handler(CommandHandler("stats", stats_command)) # تفعيل أمر stats
+    app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.run_polling()
