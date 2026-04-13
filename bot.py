@@ -6,11 +6,13 @@ from io import BytesIO
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
+# إعداد السجلات
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 USERS_FILE = "users_list.txt"
 
+# --- إدارة قائمة المستخدمين ---
 def load_users():
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, "r") as f:
@@ -26,7 +28,12 @@ def save_user(user_id):
 
 seen_users = load_users()
 
-# --- القوائم والبيانات ---
+# --- البيانات (الأذكار، القراء، السور) ---
+ADHKAR = {
+    "صباح": "☀️ **أذكار الصباح:**\n\n1- أصبَحنا وأصبَحَ المُلكُ لله والحمدُ لله لا إله إلا الله وحده لا شريك له.\n2- آية الكرسي.\n3- المعوذات (3 مرات).",
+    "مساء": "🌙 **أذكار المساء:**\n\n1- أمسينا وأمسى الملك لله والحمد لله.\n2- أعوذ بكلمات الله التامات من شر ما خلق.\n3- المعوذات (3 مرات)."
+}
+
 READERS_LIST = [
     ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
@@ -46,7 +53,7 @@ READERS_LIST = [
 
 SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
 
-# الكيبورد الرئيسي (تأكد من ظهوره دائماً)
+# --- لوحة التحكم والقوائم ---
 def get_main_keyboard():
     return ReplyKeyboardMarkup([
         [KeyboardButton("ابدأ 💙"), KeyboardButton("📖 اختر سورة")],
@@ -62,55 +69,95 @@ def build_surah_keyboard(page=1):
         row.append(InlineKeyboardButton(f"{i+1}. {SURAHS[i]}", callback_data=f"surah_{i+1}"))
         if len(row) == 3: keyboard.append(row); row = []
     if row: keyboard.append(row)
-    nav = [InlineKeyboardButton("التالي ◀️", callback_data=f"page_{2 if page==1 else 1}")]
+    nav = [InlineKeyboardButton("التالي ◀️", callback_data="page_2") if page == 1 else InlineKeyboardButton("▶️ السابق", callback_data="page_1")]
     keyboard.append(nav)
     return InlineKeyboardMarkup(keyboard)
 
-# --- الدوال الأساسية ---
-async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    save_user(user_id)
-    # نرسل الكيبورد الرئيسي مع رسالة اختيار السور لضمان ظهورهما معاً
+def build_readers_keyboard():
+    keyboard = []
+    row = []
+    for i, (name, _) in enumerate(READERS_LIST):
+        row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
+        if len(row) == 2: keyboard.append(row); row = []
+    if row: keyboard.append(row)
+    return InlineKeyboardMarkup(keyboard)
+
+# --- معالجة الأوامر والرسائل ---
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    save_user(update.effective_user.id)
     await update.message.reply_text(
-        "✨ مرحباً بك في بوت القرآن الكريم\n📖 اختر السورة التي تود الاستماع إليها:",
+        "✨ مرحباً بك في بوت القرآن الكريم.\nاستخدم الأزرار أدناه للتنقل:",
         reply_markup=get_main_keyboard()
     )
-    await update.message.reply_text("قائمة السور:", reply_markup=build_surah_keyboard(1))
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     
     if text == "ابدأ 💙":
-        await start_logic(update, context)
+        await start_command(update, context)
     elif text == "📖 اختر سورة":
-        await update.message.reply_text("📖 اختر سورة:", reply_markup=build_surah_keyboard(1))
+        await update.message.reply_text("📖 قائمة السور:", reply_markup=build_surah_keyboard(1))
+    elif text == "📿 أذكار المسلم":
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("☀️ أذكار الصباح", callback_data="dhikr_صباح")],[InlineKeyboardButton("🌙 أذكار المساء", callback_data="dhikr_مساء")]])
+        await update.message.reply_text("اختر الأذكار:", reply_markup=keyboard)
     elif text == "🎲 سورة عشوائية":
         num = random.randint(1, 114)
         context.user_data["s_num"] = num
-        await update.message.reply_text(f"🎲 سورة {SURAHS[num-1]}، اختر القارئ:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(n, callback_data=f"reader_{i}") for i, (n, _) in enumerate(READERS_LIST[:2])]]))
+        await update.message.reply_text(f"🎲 سورة {SURAHS[num-1]}، اختر القارئ:", reply_markup=build_readers_keyboard())
     elif text == "🔍 بحث":
-        await update.message.reply_text("🔍 أرسل اسم السورة للبحث:")
+        await update.message.reply_text("🔍 أرسل اسم السورة للبحث عنها:")
         context.user_data["searching"] = True
     elif text == "🔗 مشاركة البوت":
-        await update.message.reply_text("ساهم في نشر الخير 💙")
+        bot = await context.bot.get_me()
+        share_url = f"https://t.me/share/url?url=https://t.me/{bot.username}&text=استمع للقرآن الكريم 💙"
+        await update.message.reply_text(f"ساهم في نشر الخير:\n{share_url}")
+    
+    # منطق البحث
     elif context.user_data.get("searching"):
-        # منطق البحث...
-        context.user_data["searching"] = False
-    else:
-        # قفل الكتابة
-        try: await update.message.delete()
-        except: pass
+        for i, name in enumerate(SURAHS):
+            if text in name:
+                context.user_data["s_num"] = i + 1
+                await update.message.reply_text(f"✅ وجدنا سورة {name}، اختر القارئ:", reply_markup=build_readers_keyboard())
+                context.user_data["searching"] = False
+                return
+        await update.message.reply_text("❌ لم يتم العثور على السورة، حاول مجدداً.")
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if query.data.startswith("page_"):
-        await query.edit_message_text("📖 اختر سورة:", reply_markup=build_surah_keyboard(int(query.data.split("_")[1])))
-    # ... باقي الدوال (surah_ و reader_) كما هي في الكود السابق
+    data = query.data
+    
+    if data == "back_to_adhkar":
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("☀️ أذكار الصباح", callback_data="dhikr_صباح")],[InlineKeyboardButton("🌙 أذكار المساء", callback_data="dhikr_مساء")]])
+        await query.edit_message_text("اختر الأذكار:", reply_markup=keyboard)
+    elif data.startswith("dhikr_"):
+        type = data.split("_")[1]
+        await query.edit_message_text(ADHKAR[type], reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ رجوع", callback_data="back_to_adhkar")]]), parse_mode='Markdown')
+    elif data.startswith("page_"):
+        await query.edit_message_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(int(data.split("_")[1])))
+    elif data.startswith("surah_"):
+        context.user_data["s_num"] = int(data.split("_")[1])
+        await query.edit_message_text(f"🎙 اختر القارئ لسورة {SURAHS[context.user_data['s_num']-1]}:", reply_markup=build_readers_keyboard())
+    elif data.startswith("reader_"):
+        idx = int(data.split("_")[1])
+        s_num = context.user_data.get("s_num", 1)
+        r_name, r_url = READERS_LIST[idx]
+        msg = await query.edit_message_text(f"⏳ جاري تجهيز سورة {SURAHS[s_num-1]} بصوت {r_name}...")
+        
+        file_url = f"{r_url}{str(s_num).zfill(3)}.mp3"
+        try:
+            resp = requests.get(file_url, timeout=15)
+            if resp.status_code == 200:
+                audio_content = BytesIO(resp.content)
+                audio_content.name = f"{SURAHS[s_num-1]}.mp3"
+                await context.bot.send_audio(chat_id=query.message.chat_id, audio=audio_content, title=f"سورة {SURAHS[s_num-1]}", performer=r_name)
+                await msg.delete()
+            else: await msg.edit_text("❌ الملف غير متوفر حالياً.")
+        except: await msg.edit_text("❌ حدث خطأ أثناء التحميل.")
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start_logic))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.run_polling()
