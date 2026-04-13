@@ -26,6 +26,13 @@ def save_user(user_id):
 
 seen_users = load_users()
 
+# --- بيانات حصن المسلم ---
+HISN_DATA = {
+    "morning": "☀️ **أذكار الصباح:**\n\n1- أصبَحنا وأصبَحَ المُلكُ لله والحمدُ لله لا إله إلا الله وحده لا شريك له.\n2- آية الكرسي.\n3- سورة الإخلاص والمعوذتين (3 مرات).\n4- رضيت بالله رباً وبالإسلام ديناً وبمحمد ﷺ نبياً.",
+    "evening": "🌙 **أذكار المساء:**\n\n1- أمسينا وأمسى الملك لله والحمد لله.\n2- أعوذ بكلمات الله التامات من شر ما خلق (3 مرات).\n3- بسم الله الذي لا يضر مع اسمه شيء في الأرض ولا في السماء.\n4- آية الكرسي والمعوذات.",
+    "sleep": "💤 **أذكار النوم:**\n\n1- باسمك ربي وضعت جنبي وبك أرفعه.\n2- اللهم قني عذابك يوم تبعث عبادك.\n3- سورة الإخلاص والمعوذتين.\n4- آية الكرسي."
+}
+
 READERS_LIST = [
     ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
@@ -48,7 +55,8 @@ SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","ال
 def get_main_keyboard():
     return ReplyKeyboardMarkup([
         [KeyboardButton("ابدأ 💙"), KeyboardButton("📖 اختر سورة")],
-        [KeyboardButton("🎲 سورة عشوائية"), KeyboardButton("🔍 بحث")]
+        [KeyboardButton("🎲 سورة عشوائية"), KeyboardButton("🔍 بحث")],
+        [KeyboardButton("📿 حصن المسلم")]
     ], resize_keyboard=True)
 
 def build_surah_keyboard(page=1):
@@ -74,22 +82,19 @@ def build_readers_keyboard():
 
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    
     if str(user_id) not in seen_users:
         welcome_message = (
             "✨ **مرحباً بك في بوت القرآن الكريم** ✨\n\n"
             "قال رسول الله ﷺ: «اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه».\n\n"
             "📖 **اختر الآن السورة التي تود الاستماع إليها:**"
         )
-        # نحفظ معرف رسالة الترحيب لحذفها لاحقاً
         sent_msg = await update.message.reply_text(welcome_message, reply_markup=get_main_keyboard(), parse_mode='Markdown')
         context.user_data["welcome_msg_id"] = sent_msg.message_id
-        
         surah_msg = await update.message.reply_text("قائمة السور المتاحة:", reply_markup=build_surah_keyboard(1))
         context.user_data["last_menu_id"] = surah_msg.message_id
         save_user(user_id)
     else:
-        await update.message.reply_text("📖 قائمة السور:", reply_markup=get_main_keyboard())
+        await update.message.reply_text("📖 القائمة الرئيسية:", reply_markup=get_main_keyboard())
         surah_msg = await update.message.reply_text("اختر سورة:", reply_markup=build_surah_keyboard(1))
         context.user_data["last_menu_id"] = surah_msg.message_id
 
@@ -104,17 +109,30 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if data.startswith("page_"):
         await query.edit_message_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(int(data.split("_")[1])))
+    
+    elif data == "hisn_menu":
+        keyboard = [
+            [InlineKeyboardButton("☀️ أذكار الصباح", callback_data="h_morning")],
+            [InlineKeyboardButton("🌙 أذكار المساء", callback_data="h_evening")],
+            [InlineKeyboardButton("💤 أذكار النوم", callback_data="h_sleep")]
+        ]
+        await query.edit_message_text("📿 اختر الذكر المطلوب:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data.startswith("h_"):
+        key = data.split("_")[1]
+        back_btn = [[InlineKeyboardButton("◀️ رجوع", callback_data="hisn_menu")]]
+        await query.edit_message_text(HISN_DATA[key], reply_markup=InlineKeyboardMarkup(back_btn), parse_mode='Markdown')
+
     elif data.startswith("surah_"):
         context.user_data["s_num"] = int(data.split("_")[1])
         await query.edit_message_text(f"🎙 اختر القارئ لسورة {SURAHS[context.user_data['s_num']-1]}:", reply_markup=build_readers_keyboard())
+    
     elif data.startswith("reader_"):
         idx = int(data.split("_")[1])
         s_num = context.user_data.get("s_num", 1)
         r_name, r_url = READERS_LIST[idx]
         
-        # --- ميزة المسح التلقائي لرسالة الترحيب والقائمة ---
         try:
-            # مسح رسالة الترحيب (إن وجدت)
             if "welcome_msg_id" in context.user_data:
                 await context.bot.delete_message(chat_id=query.message.chat_id, message_id=context.user_data["welcome_msg_id"])
                 del context.user_data["welcome_msg_id"]
@@ -132,7 +150,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     audio_content = BytesIO(resp.content)
                     audio_content.name = f"{SURAHS[s_num-1]}.mp3"
                     await context.bot.send_audio(chat_id=query.message.chat_id, audio=audio_content, title=f"سورة {SURAHS[s_num-1]}", performer=r_name)
-                    await msg.delete() # حذف رسالة "جاري التجهيز" بعد الإرسال
+                    await msg.delete()
                     success = True
                     break
             except: continue
@@ -152,6 +170,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "🔍 بحث":
         await update.message.reply_text("أرسل اسم السورة للبحث عنها:")
         context.user_data["searching"] = True
+    elif text == "📿 حصن المسلم":
+        keyboard = [
+            [InlineKeyboardButton("☀️ أذكار الصباح", callback_data="h_morning")],
+            [InlineKeyboardButton("🌙 أذكار المساء", callback_data="h_evening")],
+            [InlineKeyboardButton("💤 أذكار النوم", callback_data="h_sleep")]
+        ]
+        await update.message.reply_text("📿 أذكار المسلم - اختر ما تريد:", reply_markup=InlineKeyboardMarkup(keyboard))
     elif context.user_data.get("searching"):
         for i, name in enumerate(SURAHS):
             if text in name:
