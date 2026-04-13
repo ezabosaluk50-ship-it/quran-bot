@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# القائمة الكاملة للقراء
+# القائمة الكاملة للقراء (14 قارئاً) - ثابتة لضمان عمل العجمي
 READERS_LIST = [
     ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
@@ -59,11 +59,24 @@ def build_readers_keyboard():
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
-# --- دالة البداية المعدلة لترسل السور فوراً ---
+# --- دالة الترحيب المعدلة ---
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # إرسال الأزرار السفلية + رسالة الترحيب مع قائمة السور
-    await update.message.reply_text("✨ تم تفعيل البوت بنجاح ✨", reply_markup=get_main_keyboard())
-    await update.message.reply_text("📖 اختر السورة التي تريد الاستماع إليها:", reply_markup=build_surah_keyboard(1))
+    welcome_message = (
+        "✨ **مرحباً بك في بوت القرآن الكريم** ✨\n\n"
+        "قال رسول الله ﷺ: «اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه».\n\n"
+        "نحن هنا لنسهل لك الاستماع لكتاب الله بصوت نخبة من القراء.\n\n"
+        "📖 **اختر الآن السورة التي تود الاستماع إليها:**"
+    )
+    
+    # إرسال الكيبورد السفلي للتثبيت
+    await update.message.reply_text("تم تحديث الواجهة 💙", reply_markup=get_main_keyboard())
+    
+    # إرسال الترحيب + قائمة السور مباشرة
+    await update.message.reply_text(
+        welcome_message, 
+        reply_markup=build_surah_keyboard(1),
+        parse_mode='Markdown'
+    )
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -101,23 +114,22 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if not text: return
 
-    # جعل زر "ابدأ 💙" يطابق وظيفة /start تماماً
     if text == "ابدأ 💙":
         await start_logic(update, context)
     elif text == "📖 اختر سورة":
-        await update.message.reply_text("📖 قائمة السور:", reply_markup=build_surah_keyboard(1))
+        await update.message.reply_text("📖 قائمة السور المتاحة:", reply_markup=build_surah_keyboard(1))
     elif text == "🎲 سورة عشوائية":
         num = random.randint(1, 114)
         context.user_data["s_num"] = num
         await update.message.reply_text(f"🎲 سورة {SURAHS[num-1]}، اختر القارئ:", reply_markup=build_readers_keyboard())
     elif text == "🔍 بحث":
-        await update.message.reply_text("أرسل اسم السورة:")
+        await update.message.reply_text("أرسل اسم السورة للبحث عنها:")
         context.user_data["searching"] = True
     elif context.user_data.get("searching"):
         for i, name in enumerate(SURAHS):
             if text in name:
                 context.user_data["s_num"] = i + 1
-                await update.message.reply_text(f"✅ سورة {name}، اختر القارئ:", reply_markup=build_readers_keyboard())
+                await update.message.reply_text(f"✅ وجدنا سورة {name}، اختر القارئ:", reply_markup=build_readers_keyboard())
                 context.user_data["searching"] = False
                 return
 
