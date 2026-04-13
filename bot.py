@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# القائمة الكاملة للقراء (14 قارئاً) - ثابتة لضمان عمل العجمي
+# القائمة الكاملة للقراء (14 قارئاً)
 READERS_LIST = [
     ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
@@ -59,7 +59,6 @@ def build_readers_keyboard():
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
-# --- دالة الترحيب المعدلة ---
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = (
         "✨ **مرحباً بك في بوت القرآن الكريم** ✨\n\n"
@@ -67,15 +66,14 @@ async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "نحن هنا لنسهل لك الاستماع لكتاب الله بصوت نخبة من القراء.\n\n"
         "📖 **اختر الآن السورة التي تود الاستماع إليها:**"
     )
-    
-    # إرسال الكيبورد السفلي للتثبيت
-    await update.message.reply_text("تم تحديث الواجهة 💙", reply_markup=get_main_keyboard())
-    
-    # إرسال الترحيب + قائمة السور مباشرة
+    # إرسال الترحيب والسور مع الكيبورد السفلي في رسالة واحدة فقط
     await update.message.reply_text(
         welcome_message, 
-        reply_markup=build_surah_keyboard(1),
-        parse_mode='Markdown'
+        reply_markup=get_main_keyboard()
+    )
+    await update.message.reply_text(
+        "قائمة السور:", 
+        reply_markup=build_surah_keyboard(1)
     )
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -117,7 +115,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "ابدأ 💙":
         await start_logic(update, context)
     elif text == "📖 اختر سورة":
-        await update.message.reply_text("📖 قائمة السور المتاحة:", reply_markup=build_surah_keyboard(1))
+        await update.message.reply_text("📖 قائمة السور:", reply_markup=build_surah_keyboard(1))
     elif text == "🎲 سورة عشوائية":
         num = random.randint(1, 114)
         context.user_data["s_num"] = num
