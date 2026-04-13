@@ -9,7 +9,6 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
-# ملف حفظ المستخدمين لضمان بقاء الإحصائيات حتى بعد إعادة التشغيل
 USERS_FILE = "users_list.txt"
 
 def load_users():
@@ -73,7 +72,6 @@ def build_readers_keyboard():
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
-# --- إصلاح دالة البداية ---
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
@@ -83,17 +81,18 @@ async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "قال رسول الله ﷺ: «اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه».\n\n"
             "📖 **اختر الآن السورة التي تود الاستماع إليها:**"
         )
-        # إرسال الترحيب + الكيبورد السفلي
-        await update.message.reply_text(welcome_message, reply_markup=get_main_keyboard(), parse_mode='Markdown')
-        # إرسال قائمة السور
-        await update.message.reply_text("قائمة السور المتاحة:", reply_markup=build_surah_keyboard(1))
+        # نحفظ معرف رسالة الترحيب لحذفها لاحقاً
+        sent_msg = await update.message.reply_text(welcome_message, reply_markup=get_main_keyboard(), parse_mode='Markdown')
+        context.user_data["welcome_msg_id"] = sent_msg.message_id
+        
+        surah_msg = await update.message.reply_text("قائمة السور المتاحة:", reply_markup=build_surah_keyboard(1))
+        context.user_data["last_menu_id"] = surah_msg.message_id
         save_user(user_id)
     else:
-        # إذا كان مستخدماً سابقاً: نرسل رسالة واحدة تحتوي على السور والأزرار السفلية (تم إصلاح الخطأ هنا)
         await update.message.reply_text("📖 قائمة السور:", reply_markup=get_main_keyboard())
-        await update.message.reply_text("اختر سورة:", reply_markup=build_surah_keyboard(1))
+        surah_msg = await update.message.reply_text("اختر سورة:", reply_markup=build_surah_keyboard(1))
+        context.user_data["last_menu_id"] = surah_msg.message_id
 
-# --- أمر الإحصائيات ---
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     count = len(seen_users)
     await update.message.reply_text(f"📊 **إحصائيات البوت:**\n\n👥 عدد المستخدمين الكلي: {count}", parse_mode='Markdown')
@@ -112,6 +111,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         idx = int(data.split("_")[1])
         s_num = context.user_data.get("s_num", 1)
         r_name, r_url = READERS_LIST[idx]
+        
+        # --- ميزة المسح التلقائي لرسالة الترحيب والقائمة ---
+        try:
+            # مسح رسالة الترحيب (إن وجدت)
+            if "welcome_msg_id" in context.user_data:
+                await context.bot.delete_message(chat_id=query.message.chat_id, message_id=context.user_data["welcome_msg_id"])
+                del context.user_data["welcome_msg_id"]
+        except: pass
+
         msg = await query.edit_message_text(f"⏳ جاري تجهيز سورة {SURAHS[s_num-1]} بصوت {r_name}...")
         
         servers = [r_url, r_url.replace("server10", "server11"), r_url.replace("server10", "server6")]
@@ -124,7 +132,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     audio_content = BytesIO(resp.content)
                     audio_content.name = f"{SURAHS[s_num-1]}.mp3"
                     await context.bot.send_audio(chat_id=query.message.chat_id, audio=audio_content, title=f"سورة {SURAHS[s_num-1]}", performer=r_name)
-                    await msg.delete()
+                    await msg.delete() # حذف رسالة "جاري التجهيز" بعد الإرسال
                     success = True
                     break
             except: continue
@@ -135,7 +143,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "ابدأ 💙":
         await start_logic(update, context)
     elif text == "📖 اختر سورة":
-        await update.message.reply_text("📖 قائمة السور:", reply_markup=build_surah_keyboard(1))
+        surah_msg = await update.message.reply_text("📖 قائمة السور:", reply_markup=build_surah_keyboard(1))
+        context.user_data["last_menu_id"] = surah_msg.message_id
     elif text == "🎲 سورة عشوائية":
         num = random.randint(1, 114)
         context.user_data["s_num"] = num
