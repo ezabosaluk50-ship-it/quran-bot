@@ -9,8 +9,26 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
+# اسم الملف الذي سنخزن فيه معرفات المستخدمين لضمان عدم ضياع الإحصائيات
+USERS_FILE = "users_list.txt"
 
-# القائمة الكاملة للقراء (14 قارئاً)
+# دالة لتحميل المستخدمين من الملف عند تشغيل البوت
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, "r") as f:
+            return set(line.strip() for line in f)
+    return set()
+
+# دالة لحفظ مستخدم جديد في الملف
+def save_user(user_id):
+    if str(user_id) not in seen_users:
+        seen_users.add(str(user_id))
+        with open(USERS_FILE, "a") as f:
+            f.write(f"{user_id}\n")
+
+seen_users = load_users()
+
+# --- القوائم السابقة (ثابتة كما هي) ---
 READERS_LIST = [
     ("أحمد العجمي", "https://server10.mp3quran.net/ajm/"),
     ("مشاري العفاسي", "https://server8.mp3quran.net/afs/"),
@@ -42,10 +60,9 @@ def build_surah_keyboard(page=1):
     row = []
     for i in range(start, end):
         row.append(InlineKeyboardButton(f"{i+1}. {SURAHS[i]}", callback_data=f"surah_{i+1}"))
-        if len(row) == 3:
-            keyboard.append(row); row = []
+        if len(row) == 3: keyboard.append(row); row = []
     if row: keyboard.append(row)
-    nav = [InlineKeyboardButton("التالي ◀️", callback_data="page_2")] if page == 1 else [InlineKeyboardButton("▶️ السابق", callback_data="page_1")]
+    nav = [InlineKeyboardButton("التالي ◀️", callback_data="page_2") if page == 1 else InlineKeyboardButton("▶️ السابق", callback_data="page_1")]
     keyboard.append(nav)
     return InlineKeyboardMarkup(keyboard)
 
@@ -54,27 +71,31 @@ def build_readers_keyboard():
     row = []
     for i, (name, _) in enumerate(READERS_LIST):
         row.append(InlineKeyboardButton(name, callback_data=f"reader_{i}"))
-        if len(row) == 2:
-            keyboard.append(row); row = []
+        if len(row) == 2: keyboard.append(row); row = []
     if row: keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
+# --- دالة البداية ---
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome_message = (
-        "✨ **مرحباً بك في بوت القرآن الكريم** ✨\n\n"
-        "قال رسول الله ﷺ: «اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه».\n\n"
-        "نحن هنا لنسهل لك الاستماع لكتاب الله بصوت نخبة من القراء.\n\n"
-        "📖 **اختر الآن السورة التي تود الاستماع إليها:**"
-    )
-    # إرسال الترحيب والسور مع الكيبورد السفلي في رسالة واحدة فقط
-    await update.message.reply_text(
-        welcome_message, 
-        reply_markup=get_main_keyboard()
-    )
-    await update.message.reply_text(
-        "قائمة السور:", 
-        reply_markup=build_surah_keyboard(1)
-    )
+    user_id = update.effective_user.id
+    
+    if str(user_id) not in seen_users:
+        welcome_message = (
+            "✨ **مرحباً بك في بوت القرآن الكريم** ✨\n\n"
+            "قال رسول الله ﷺ: «اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه».\n\n"
+            "نحن هنا لنسهل لك الاستماع لكتاب الله بصوت نخبة من القراء.\n\n"
+            "📖 **اختر الآن السورة التي تود الاستماع إليها:**"
+        )
+        await update.message.reply_text(welcome_message, reply_markup=get_main_keyboard(), parse_mode='Markdown')
+        await update.message.reply_text("قائمة السور:", reply_markup=build_surah_keyboard(1))
+        save_user(user_id)
+    else:
+        await update.message.reply_text("📖 قائمة السور:", reply_markup=build_surah_keyboard(1), reply_markup=get_main_keyboard())
+
+# --- دالة الإحصائيات الجديدة ---
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    count = len(seen_users)
+    await update.message.reply_text(f"📊 **إحصائيات البوت:**\n\n👥 عدد المستخدمين الكلي: {count}", parse_mode='Markdown')
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -110,8 +131,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    if not text: return
-
     if text == "ابدأ 💙":
         await start_logic(update, context)
     elif text == "📖 اختر سورة":
@@ -134,6 +153,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start_logic))
+    app.add_handler(CommandHandler("stats", stats_command)) # تفعيل أمر stats
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.run_polling()
