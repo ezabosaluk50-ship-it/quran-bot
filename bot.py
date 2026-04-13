@@ -26,7 +26,6 @@ def save_user(user_id):
 
 seen_users = load_users()
 
-# --- البيانات الجديدة: أذكار المسلم ---
 ADHKAR = {
     "صباح": "☀️ **أذكار الصباح:**\n\n1- أصبَحنا وأصبَحَ المُلكُ لله والحمدُ لله لا إله إلا الله وحده لا شريك له.\n2- آية الكرسي (اللَّهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ).\n3- سورة الإخلاص والمعوذتين (3 مرات).",
     "مساء": "🌙 **أذكار المساء:**\n\n1- أمسينا وأمسى الملك لله والحمد لله.\n2- أعوذ بكلمات الله التامات من شر ما خلق.\n3- سورة الإخلاص والمعوذتين (3 مرات)."
@@ -49,14 +48,15 @@ READERS_LIST = [
     ("محمود الحصري", "https://server13.mp3quran.net/husr/"),
 ]
 
-SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
+SURAHS = ["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبيـاء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"]
 
 def get_main_keyboard():
+    # تأكدنا هنا من ترتيب الأزرار لتعود للظهور دائماً
     return ReplyKeyboardMarkup([
         [KeyboardButton("ابدأ 💙"), KeyboardButton("📖 اختر سورة")],
         [KeyboardButton("📿 أذكار المسلم"), KeyboardButton("🎲 سورة عشوائية")],
         [KeyboardButton("🔍 بحث"), KeyboardButton("🔗 مشاركة البوت")]
-    ], resize_keyboard=True)
+    ], resize_keyboard=True, persistent=True)
 
 def build_surah_keyboard(page=1):
     start, end = (0, 57) if page == 1 else (57, 114)
@@ -82,12 +82,13 @@ def build_readers_keyboard():
 async def start_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if str(user_id) not in seen_users:
-        welcome_message = "✨ **مرحباً بك في بوت القرآن الكريم** ✨\n\nقال رسول الله ﷺ: «اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه».\n\n📖 **اختر الآن السورة التي تود الاستماع إليها:**"
+        welcome_message = "✨ **مرحباً بك في بوت القرآن الكريم** ✨\n\n📖 **اختر الآن السورة التي تود الاستماع إليها:**"
         sent_msg = await update.message.reply_text(welcome_message, reply_markup=get_main_keyboard(), parse_mode='Markdown')
         context.user_data["welcome_msg_id"] = sent_msg.message_id
         await update.message.reply_text("قائمة السور:", reply_markup=build_surah_keyboard(1))
         save_user(user_id)
     else:
+        # هنا نعيد إرسال الكيبورد الرئيسي في حال اختفائه
         await update.message.reply_text("📖 قائمة السور:", reply_markup=get_main_keyboard())
         await update.message.reply_text("اختر سورة:", reply_markup=build_surah_keyboard(1))
 
@@ -96,6 +97,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     
+    if data == "back_to_adhkar":
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("☀️ أذكار الصباح", callback_data="dhikr_صباح")],
+            [InlineKeyboardButton("🌙 أذكار المساء", callback_data="dhikr_مساء")]
+        ])
+        await query.edit_message_text("اختر الأذكار التي تود قراءتها:", reply_markup=keyboard)
+        return
+
+    if data.startswith("dhikr_"):
+        type = data.split("_")[1]
+        back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("◀️ رجوع", callback_data="back_to_adhkar")]])
+        await query.edit_message_text(ADHKAR[type], reply_markup=back_kb, parse_mode='Markdown')
+        return
+
     if data.startswith("page_"):
         await query.edit_message_text("📖 اختر السورة:", reply_markup=build_surah_keyboard(int(data.split("_")[1])))
     elif data.startswith("surah_"):
@@ -106,7 +121,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         s_num = context.user_data.get("s_num", 1)
         r_name, r_url = READERS_LIST[idx]
         
-        # حذف رسالة الترحيب إن وجدت لجعل المحادثة نظيفة
         try:
             if "welcome_msg_id" in context.user_data:
                 await context.bot.delete_message(chat_id=query.message.chat_id, message_id=context.user_data["welcome_msg_id"])
@@ -114,21 +128,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
 
         msg = await query.edit_message_text(f"⏳ جاري تجهيز سورة {SURAHS[s_num-1]} بصوت {r_name}...")
-        servers = [r_url, r_url.replace("server10", "server11"), r_url.replace("server10", "server6")]
-        success = False
-        for base_url in servers:
-            file_url = f"{base_url}{str(s_num).zfill(3)}.mp3"
-            try:
-                resp = requests.get(file_url, timeout=15)
-                if resp.status_code == 200:
-                    audio_content = BytesIO(resp.content)
-                    audio_content.name = f"{SURAHS[s_num-1]}.mp3"
-                    await context.bot.send_audio(chat_id=query.message.chat_id, audio=audio_content, title=f"سورة {SURAHS[s_num-1]}", performer=r_name)
-                    await msg.delete()
-                    success = True
-                    break
-            except: continue
-        if not success: await msg.edit_text("❌ الملف غير متوفر حالياً.")
+        file_url = f"{r_url}{str(s_num).zfill(3)}.mp3"
+        try:
+            resp = requests.get(file_url, timeout=15)
+            if resp.status_code == 200:
+                audio_content = BytesIO(resp.content)
+                audio_content.name = f"{SURAHS[s_num-1]}.mp3"
+                await context.bot.send_audio(chat_id=query.message.chat_id, audio=audio_content, title=f"سورة {SURAHS[s_num-1]}", performer=r_name)
+                await msg.delete()
+            else: await msg.edit_text("❌ الملف غير متوفر.")
+        except: await msg.edit_text("❌ حدث خطأ في الاتصال.")
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
@@ -141,7 +150,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("☀️ أذكار الصباح", callback_data="dhikr_صباح")],
             [InlineKeyboardButton("🌙 أذكار المساء", callback_data="dhikr_مساء")]
         ])
-        await update.message.reply_text("اختر الأذكار التي تود قراءتها:", reply_markup=keyboard)
+        await update.message.reply_text("اختر الأذكار:", reply_markup=keyboard)
     elif text == "🎲 سورة عشوائية":
         num = random.randint(1, 114)
         context.user_data["s_num"] = num
@@ -151,28 +160,19 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["searching"] = True
     elif text == "🔗 مشاركة البوت":
         bot_username = (await context.bot.get_me()).username
-        share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=استمع للقرآن الكريم بأجمل الأصوات عبر هذا البوت 💙"
-        await update.message.reply_text(f"ساهم في نشر الخير 💙\n\n[اضغط هنا لمشاركة البوت]({share_url})", parse_mode='Markdown')
+        share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=استمع للقرآن الكريم 💙"
+        await update.message.reply_text(f"[اضغط هنا لمشاركة البوت]({share_url})", parse_mode='Markdown')
     elif context.user_data.get("searching"):
         for i, name in enumerate(SURAHS):
             if text in name:
                 context.user_data["s_num"] = i + 1
-                await update.message.reply_text(f"✅ وجدنا سورة {name}، اختر القارئ:", reply_markup=build_readers_keyboard())
+                await update.message.reply_text(f"✅ سورة {name}، اختر القارئ:", reply_markup=build_readers_keyboard())
                 context.user_data["searching"] = False
                 return
-
-# إضافة معالج الأذكار ضمن الـ callback_query
-async def adhkar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    if query.data.startswith("dhikr_"):
-        type = query.data.split("_")[1]
-        await query.edit_message_text(ADHKAR[type], parse_mode='Markdown')
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start_logic))
-    app.add_handler(CommandHandler("stats", lambda u, c: u.message.reply_text(f"📊 مستخدمي البوت الكلي: {len(seen_users)}")))
-    app.add_handler(CallbackQueryHandler(adhkar_callback, pattern="^dhikr_"))
+    app.add_handler(CommandHandler("stats", lambda u, c: u.message.reply_text(f"📊 المستخدمين: {len(seen_users)}")))
     app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.run_polling()
